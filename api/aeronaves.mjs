@@ -5,12 +5,13 @@
 // guarda en caché unos segundos y limita solicitudes. Ningún proveedor de esta fase usa clave;
 // cuando alguno la necesite se leerá de process.env y nunca saldrá en una respuesta.
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.2';
 const AGENTE = `SkyTrackRadar/${VERSION} (uso personal, no comercial)`;
 const SEG_CACHE = 5;            // una misma zona no se consulta al proveedor más de una vez cada 5 s
 const MS_ESPERA = 7000;         // tiempo máximo por proveedor
 const MS_ENTRE_LLAMADAS = 1100; // los proveedores ADS-B comunitarios piden 1 solicitud por segundo
 const MS_CASTIGO = 60000;       // pausa de un proveedor tras responder 429
+const MS_SIN_PERMISO = 900000;  // pausa de 15 min si responde 401 o 403: insistir no sirve y es descortés
 const MAX_POR_IP = 40;          // solicitudes por minuto y por IP (mejor esfuerzo: la memoria es por instancia)
 const RADIO_MAX = 250;
 const MAX_AERONAVES = 1500;
@@ -18,7 +19,7 @@ const MAX_AERONAVES = 1500;
 // Designadores OACI de aerolíneas frecuentes. Solo sirven para rotular; la ficha avisa de que es una deducción.
 const AEROLINEAS = {
   AAL: 'American Airlines', JBU: 'JetBlue', DAL: 'Delta Air Lines', UAL: 'United Airlines', NKS: 'Spirit Airlines',
-  FFT: 'Frontier Airlines', SWA: 'Southwest Airlines', DWI: 'Arajet', CMP: 'Copa Airlines', AVA: 'Avianca',
+  FFT: 'Frontier Airlines', MXY: 'Breeze Airways', BWA: 'Caribbean Airlines', SWA: 'Southwest Airlines', DWI: 'Arajet', CMP: 'Copa Airlines', AVA: 'Avianca',
   IBE: 'Iberia', AEA: 'Air Europa', AFR: 'Air France', BAW: 'British Airways', DLH: 'Lufthansa', KLM: 'KLM',
   TAP: 'TAP Air Portugal', ACA: 'Air Canada', ROU: 'Air Canada Rouge', WJA: 'WestJet', TSC: 'Air Transat',
   SWG: 'Sunwing Airlines', CFG: 'Condor', EDW: 'Edelweiss Air', TOM: 'TUI Airways', UPS: 'UPS Airlines', FDX: 'FedEx Express',
@@ -29,11 +30,15 @@ const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const texto = (v, max = 40) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 
 // La fuente no dice si un vuelo es comercial o privado: se estima y se marca como estimación.
-function clasificar(indicativo, tipo, militar) {
+// Un indicativo de tres letras y números suele ser de aerolínea, pero también lo usan aeroclubes y
+// patrullas con avionetas: si la aeronave es ligera (categoría A1) o un helicóptero (A7) y el
+// designador no es de una aerolínea conocida, se considera aviación general.
+function clasificar(indicativo, tipo, militar, categoria) {
   if (militar) return 'militar';
   const m = indicativo && /^([A-Z]{3})\d/.exec(indicativo);
-  if (m) return tipo && TURBOHELICES_REGIONALES.has(tipo) ? 'regional' : 'comercial';
-  return 'privado';
+  if (!m) return 'privado';
+  if (!AEROLINEAS[m[1]] && (categoria === 'A1' || categoria === 'A7')) return 'privado';
+  return tipo && TURBOHELICES_REGIONALES.has(tipo) ? 'regional' : 'comercial';
 }
 
 // Formato «ADS-B Exchange v2» que comparten Airplanes.live y adsb.fi.
@@ -58,11 +63,11 @@ function normalizarReadsb(cuerpo, fuente, ahora) {
       matricula: texto(a.r, 12), tipo, modelo: texto(a.desc, 60),
       origen: null, destino: null, salida: null, llegada: null, // las redes ADS-B no informan la ruta
       estado: enTierra ? 'en-tierra' : conPos ? 'en-vuelo' : 'desconocido',
-      cat: clasificar(indicativo, tipo, (num(a.dbFlags) & 1) === 1), catEstimada: true,
+      cat: clasificar(indicativo, tipo, (num(a.dbFlags) & 1) === 1, texto(a.category, 2)), catEstimada: true,
       lat: conPos ? lat : null, lon: conPos ? lon : null,
       alt: enTierra ? 0 : num(a.alt_baro) ?? num(a.alt_geom),
       gs: num(a.gs), vs: num(a.baro_rate) ?? num(a.geom_rate), rumbo: num(a.track) ?? num(a.true_heading),
-      transpondedor: texto(a.squawk, 4),
+      transpondedor: texto(a.squawk, 4), categoria: texto(a.category, 2),
       recibido: conPos && edadPos !== null ? Math.round(ahora - edadPos * 1000) : null,
       fuente, simulado: false,
     });
@@ -112,11 +117,13 @@ function cajaDe(lat, lon, nm) {
 }
 
 // Orden de preferencia. Cambiar de proveedor es editar esta lista.
+// adsb.fi va primero: comprobado en producción. Airplanes.live respondió 403 desde Vercel
+// (pide solicitar acceso); queda de reserva por si lo conceden.
 const PROVEEDORES = [
-  { id: 'airplanes-live', nombre: 'Airplanes.live',
-    url: (q) => `https://api.airplanes.live/v2/point/${q.lat}/${q.lon}/${q.radio}`, normalizar: normalizarReadsb },
   { id: 'adsb-fi', nombre: 'adsb.fi',
     url: (q) => `https://opendata.adsb.fi/api/v2/lat/${q.lat}/lon/${q.lon}/dist/${q.radio}`, normalizar: normalizarReadsb },
+  { id: 'airplanes-live', nombre: 'Airplanes.live',
+    url: (q) => `https://api.airplanes.live/v2/point/${q.lat}/${q.lon}/${q.radio}`, normalizar: normalizarReadsb },
   { id: 'opensky', nombre: 'OpenSky Network',
     url: (q) => { const c = cajaDe(q.lat, q.lon, q.radio); return `https://opensky-network.org/api/states/all?lamin=${c.sur.toFixed(3)}&lomin=${c.oeste.toFixed(3)}&lamax=${c.norte.toFixed(3)}&lomax=${c.este.toFixed(3)}`; },
     normalizar: normalizarOpenSky },
@@ -146,7 +153,7 @@ function ipExcedida(ip, ahora) {
 }
 
 async function consultar(prov, q, ahora, traer) {
-  if ((memoria.castigo.get(prov.id) || 0) > ahora) return { id: prov.id, nombre: prov.nombre, ok: false, motivo: 'cuota' };
+  if ((memoria.castigo.get(prov.id) || 0) > ahora) return { id: prov.id, nombre: prov.nombre, ok: false, motivo: 'en-pausa' };
   if (ahora - (memoria.ultima.get(prov.id) || 0) < MS_ENTRE_LLAMADAS) return { id: prov.id, nombre: prov.nombre, ok: false, motivo: 'ritmo' };
   memoria.ultima.set(prov.id, ahora);
   const control = new AbortController();
@@ -154,6 +161,7 @@ async function consultar(prov, q, ahora, traer) {
   try {
     const r = await traer(prov.url(q), { headers: { 'User-Agent': AGENTE, Accept: 'application/json' }, signal: control.signal });
     if (r.status === 429) { memoria.castigo.set(prov.id, ahora + MS_CASTIGO); return { id: prov.id, nombre: prov.nombre, ok: false, motivo: 'cuota' }; }
+    if (r.status === 401 || r.status === 403) { memoria.castigo.set(prov.id, ahora + MS_SIN_PERMISO); return { id: prov.id, nombre: prov.nombre, ok: false, motivo: 'sin-permiso' }; }
     if (!r.ok) return { id: prov.id, nombre: prov.nombre, ok: false, motivo: 'http-' + r.status };
     const vuelos = prov.normalizar(await r.json(), prov.nombre, ahora);
     return { id: prov.id, nombre: prov.nombre, ok: true, vuelos };
@@ -197,7 +205,7 @@ async function atender(request, { traer = fetch, ahora = Date.now() } = {}) {
   }
   // Ningún proveedor respondió. Si queda una copia reciente (menos de 2 min) se entrega marcada como antigua.
   if (guardado && ahora - guardado.recibido < 120000) return json(200, { ...guardado, enCache: true, proveedores: intentos }, { 'Cache-Control': 'no-store' });
-  const todosCuota = intentos.every((i) => i.motivo === 'cuota' || i.motivo === 'ritmo');
+  const todosCuota = intentos.every((i) => ['cuota', 'ritmo', 'en-pausa'].includes(i.motivo));
   return json(todosCuota ? 429 : 502, { error: todosCuota ? 'cuota' : 'proveedores', detalle: 'Ninguna fuente de posiciones respondió.', proveedores: intentos },
     { 'Cache-Control': 'no-store', ...(todosCuota ? { 'Retry-After': '30' } : {}) });
 }
