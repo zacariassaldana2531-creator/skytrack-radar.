@@ -321,8 +321,9 @@ button { cursor: pointer; }
 .mapa-nota { position: absolute; left: var(--e-3); bottom: 72px; z-index: 2; max-width: 70%; padding: 4px var(--e-2); background: rgba(22, 29, 41, .9); border-radius: 4px; font-size: var(--t-xs); color: var(--ambar); }
 @media (min-width: 900px) { .mapa-nota { bottom: var(--e-3); } }
 .aeronave-etq.etq-mapa { left: 0; top: 0; }
-.maplibregl-ctrl-bottom-right { bottom: 64px; }
-@media (min-width: 900px) { .maplibregl-ctrl-bottom-right { bottom: 0; } }
+/* Dos clases: la hoja de MapLibre llega después y, con una sola, ganaría la suya. */
+.lienzo .maplibregl-ctrl-bottom-right { bottom: 68px; }
+@media (min-width: 900px) { .lienzo .maplibregl-ctrl-bottom-right { bottom: 0; } }
 .aeronave {
   position: absolute; width: var(--toque); height: var(--toque); margin: -22px 0 0 -22px;
   display: grid; place-items: center;
@@ -346,8 +347,26 @@ button { cursor: pointer; }
   font-size: var(--t-xs); color: var(--tenue);
 }
 .actualizacion b { color: var(--texto); font-weight: 500; }
+.actualizacion small { display: block; font-size: .6875rem; color: var(--ambar); }
 .actualizacion.ambar { border-color: #6b5215; color: var(--ambar); }
 .actualizacion.ambar b { color: var(--ambar); }
+.leyenda {
+  position: absolute; left: var(--e-3); bottom: 76px; z-index: 3; width: min(280px, calc(100% - 24px));
+  padding: var(--e-3) var(--e-4); background: rgba(22, 29, 41, .97); border: 1px solid var(--linea); border-radius: 8px;
+  display: none; font-size: var(--t-s);
+}
+.leyenda.abierta { display: block; }
+.leyenda h3 { font: 600 1rem/1.2 var(--f-dato); color: var(--tenue); margin: var(--e-3) 0 6px; }
+.leyenda h3:first-child { margin-top: 0; }
+.leyenda li { display: grid; grid-template-columns: 26px 1fr; gap: var(--e-2); align-items: center; padding: 3px 0; }
+.leyenda svg { width: 22px; height: 22px; fill: var(--turquesa); justify-self: center; }
+.leyenda .ambar svg { fill: var(--ambar); }
+.leyenda .tierra svg { fill: none; stroke: var(--tenue); stroke-width: 1.4; }
+.leyenda i { justify-self: center; }
+.leyenda .anillo { width: 11px; height: 11px; border: 1.5px solid var(--texto); border-radius: 50%; }
+.leyenda .discontinua { width: 22px; border-top: 1.5px dashed var(--tenue); }
+.leyenda .linea { width: 22px; border-top: 2px solid var(--turquesa); }
+@media (min-width: 900px) { .leyenda { display: block; bottom: var(--e-3); width: 250px; } }
 .mapa-acciones { z-index: 2; position: absolute; left: var(--e-3); right: var(--e-3); bottom: var(--e-3); display: flex; gap: var(--e-2); }
 .mapa-acciones .btn { background: rgba(22, 29, 41, .95); }
 
@@ -524,7 +543,9 @@ button { cursor: pointer; }
         <div class="mapa-acciones solo-movil">
           <button type="button" class="btn" id="abrirLista">Vuelos <span class="conteo" id="conteoMovil"></span></button>
           <button type="button" class="btn" id="abrirFiltros">Filtros <span class="conteo" id="filtrosMovil"></span></button>
+          <button type="button" class="btn" id="abrirLeyenda" aria-expanded="false" aria-controls="leyenda">Leyenda</button>
         </div>
+        <div class="leyenda" id="leyenda"></div>
       </div>
 
       <aside class="panel panel-ficha" id="panelFicha" aria-label="Ficha del vuelo" aria-live="polite"></aside>
@@ -625,8 +646,8 @@ const INTERVALOS = [5, 10, 15, 30, 60];
 const SEG_DESACTUALIZADO = 60;
 
 const PROVEEDORES = [
-  { id: 'airplanes-live', nombre: 'Airplanes.live', papel: 'Posiciones, principal', estado: 'pendiente', detalle: 'Hasta 250 millas náuticas por consulta, 1 solicitud por segundo.' },
-  { id: 'adsb-fi', nombre: 'adsb.fi', papel: 'Posiciones, respaldo', estado: 'pendiente', detalle: 'Se usa si la principal no responde.' },
+  { id: 'adsb-fi', nombre: 'adsb.fi', papel: 'Posiciones, principal', estado: 'pendiente', detalle: 'Hasta 250 millas náuticas por consulta, 1 solicitud por segundo.' },
+  { id: 'airplanes-live', nombre: 'Airplanes.live', papel: 'Posiciones, respaldo', estado: 'pendiente', detalle: 'Exige solicitar acceso; mientras no lo concedan responde sin permiso.' },
   { id: 'opensky', nombre: 'OpenSky Network', papel: 'Posiciones, tercera opción', estado: 'pendiente', detalle: 'Sin matrícula ni tipo de aeronave. Cuota diaria reducida sin cuenta.' },
   { id: 'aeroapi', nombre: 'FlightAware AeroAPI', papel: 'Horarios y estados', estado: 'sin-config', detalle: 'Opcional, Fase 5. Necesita una clave guardada en el servidor.' },
 ];
@@ -662,7 +683,7 @@ const VUELOS_MUESTRA = [
   { id: 'demo02', vuelo: 'DEMO202', aerolinea: 'Aerolínea de muestra B', matricula: 'XX-DM2', tipo: 'B738', modelo: 'Boeing 737-800', hex: 'DEMO02',
     origen: 'JFK', destino: 'PUJ', estado: 'en-vuelo', cat: 'comercial', catEstimada: false,
     alt: 12400, gs: 298, vs: -1400, rumbo: 172, lat: 20.4, lon: -68.9, salida: '11:30', llegada: '15:10', fuente: 'Muestra' },
-  { id: 'demo03', vuelo: 'XXDM3', aerolinea: null, matricula: 'XX-DM3', tipo: 'C208', modelo: 'Cessna 208 Caravan', hex: 'DEMO03',
+  { id: 'demo03', vuelo: 'XXDM3', aerolinea: null, matricula: 'XX-DM3', tipo: 'C208', modelo: 'Cessna 208 Caravan', hex: 'DEMO03', categoria: 'A1',
     origen: null, destino: null, estado: 'en-vuelo', cat: 'privado', catEstimada: true,
     alt: 6500, gs: 148, vs: 300, rumbo: 85, lat: 18.9, lon: -69.6, salida: null, llegada: null, fuente: 'Muestra' },
   { id: 'demo04', vuelo: 'DEMO404', aerolinea: 'Regional de muestra', matricula: 'XX-DM4', tipo: 'AT76', modelo: 'ATR 72-600', hex: 'DEMO04',
@@ -719,7 +740,26 @@ const ESTADOS_VUELO = {
 const CATEGORIAS = { comercial: 'Comercial', regional: 'Regional', privado: 'Privado', militar: 'Militar' };
 const nombreDe = (v) => v.vuelo || v.matricula || v.hex || ND;
 
-const ICONO_AVION = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.6 0 1 .9 1 2v5l8 5v2l-8-2.5V19l2.5 2v1.5L12 21.5l-3.5 1V21l2.5-2v-5.5L3 16v-2l8-5V4c0-1.1.4-2 1-2z"/></svg>';
+// Siluetas vistas desde arriba, con el morro hacia el norte (24 x 24).
+const TRAZOS = {
+  reactor: 'M12 2c.6 0 1 .9 1 2v5l8 5v2l-8-2.5V19l2.5 2v1.5L12 21.5l-3.5 1V21l2.5-2v-5.5L3 16v-2l8-5V4c0-1.1.4-2 1-2z',
+  ligera: 'M12 3c.5 0 .9.6.9 1.4v4.2h7.6c.5 0 .9.4.9.9v1.2c0 .4-.3.8-.7.9L12.900 13v5.200l2.600 1.100c.3.1.5.4.5.7v.6c0 .3-.3.5-.6.5H8.600c-.3 0-.6-.2-.6-.5V20c0-.3.2-.6.5-.7l2.600-1.100V13l-7.800-1.400c-.4-.1-.7-.5-.7-.9V9.500c0-.5.4-.9.9-.9h7.600V4.400c0-.8.4-1.400.9-1.400z',
+  helicoptero: 'M12 5.500c1.700 0 2.800 1.600 2.800 4.200 0 1.900-.7 3.400-1.900 4.100V20h1.800v1.400H9.300V20h1.800v-6.200c-1.200-.7-1.900-2.200-1.900-4.100 0-2.600 1.100-4.200 2.800-4.200zM4.200 3.300l.9-.9 14.700 14.700-.9.9zM18.900 2.400l.9.9L5.100 18l-.9-.9z',
+};
+const CLASES = { reactor: 'Avión de línea o reactor', ligera: 'Avioneta', helicoptero: 'Helicóptero' };
+const svgIcono = (clase = 'reactor') => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${TRAZOS[clase] || TRAZOS.reactor}"/></svg>`;
+const ICONO_AVION = svgIcono('reactor');
+
+const TIPOS_HELICOPTERO = new Set(['R22', 'R44', 'R66', 'B06', 'B407', 'B412', 'B429', 'B505', 'EC20', 'EC30', 'EC35', 'EC45', 'AS50', 'AS55', 'AS65', 'H125', 'H130', 'H135', 'H145', 'A109', 'A119', 'A139', 'A169', 'S76', 'S92', 'H60', 'UH1', 'MI8', 'MD52', 'H500']);
+const TIPOS_LIGEROS = new Set(['C150', 'C152', 'C162', 'C172', 'C177', 'C180', 'C182', 'C82T', 'C185', 'C206', 'C207', 'C208', 'C210', 'C310', 'C337', 'SR20', 'SR22', 'S22T', 'P28A', 'P28B', 'P28R', 'P28T', 'PA18', 'PA24', 'PA32', 'P32R', 'PA34', 'PA44', 'PA46', 'P46T', 'BE33', 'BE35', 'BE36', 'BE55', 'BE58', 'BE76', 'DA20', 'DA40', 'DA42', 'DA62', 'M20P', 'M20T', 'AA5', 'DV20', 'BN2P', 'PC12', 'TBM7', 'TBM8', 'TBM9', 'ULAC', 'GLID']);
+
+// La forma del icono sale de la categoría que transmite la aeronave o, si falta, del tipo.
+// Sin ninguno de los dos se usa la silueta genérica de reactor.
+function claseDe(v) {
+  if (v.categoria === 'A7' || TIPOS_HELICOPTERO.has(v.tipo)) return 'helicoptero';
+  if (v.categoria === 'A1' || v.categoria === 'B1' || v.categoria === 'B4' || TIPOS_LIGEROS.has(v.tipo)) return 'ligera';
+  return 'reactor';
+}
 
 // Distingue qué está buscando la persona antes de consultar.
 function detectarConsulta(texto) {
@@ -1141,7 +1181,8 @@ function consultaDesde(limites) {
     lat: Math.round(lat * 4) / 4,
     lon: Math.round(lon * 4) / 4,
     radio: Math.max(25, Math.min(RADIO_MAX_NM, Math.ceil(real / 25) * 25)),
-    recortado: real > RADIO_MAX_NM + 25,
+    // Solo se avisa cuando el mapa abarca bastante más que la zona consultada, no por unas esquinas.
+    recortado: real > RADIO_MAX_NM * 1.4,
   };
 }
 
@@ -1173,23 +1214,35 @@ function crearFuenteServidor({ ruta = '/api/aeronaves', alConsultar } = {}) {
 // ---- mapa/mapa-maplibre.js
 // Mapa real con MapLibre GL JS y un estilo vectorial externo.
 
-const TRAZO_AVION = 'M12 2c.6 0 1 .9 1 2v5l8 5v2l-8-2.5V19l2.5 2v1.5L12 21.5l-3.5 1V21l2.5-2v-5.5L3 16v-2l8-5V4c0-1.1.4-2 1-2z';
-const COLORES = { vuelo: '#35d0ba', viejo: '#f0b23e', tierra: '#9aa8bc' };
 
-// Dibuja el icono en un lienzo y lo entrega como imagen para el mapa.
-function imagenAvion(color, hueco) {
-  const px = 2, lado = 28 * px;
+const COLORES = { vuelo: '#35d0ba', viejo: '#f0b23e', tierra: '#9aa8bc' };
+const LADO = { reactor: 30, ligera: 24, helicoptero: 26 };
+
+// Dibuja la silueta en un lienzo y la entrega como imagen para el mapa.
+function imagenAvion(clase, color, hueco) {
+  const px = 2, lado = LADO[clase] * px;
   const c = document.createElement('canvas');
   c.width = lado; c.height = lado;
   const g = c.getContext('2d');
-  g.scale((lado / 24), (lado / 24));
-  const ruta = new Path2D(TRAZO_AVION);
+  g.scale(lado / 24, lado / 24);
+  const ruta = new Path2D(TRAZOS[clase]);
   g.lineJoin = 'round';
-  g.strokeStyle = '#061220'; g.lineWidth = 2.2; g.stroke(ruta);
-  if (hueco) { g.strokeStyle = color; g.lineWidth = 1.2; g.fillStyle = '#061220'; g.fill(ruta); g.stroke(ruta); }
+  g.strokeStyle = '#061220'; g.lineWidth = 2.4; g.stroke(ruta);
+  if (hueco) { g.fillStyle = '#061220'; g.fill(ruta); g.strokeStyle = color; g.lineWidth = 1.2; g.stroke(ruta); }
   else { g.fillStyle = color; g.fill(ruta); }
   const d = g.getImageData(0, 0, lado, lado);
   return { width: lado, height: lado, data: d.data };
+}
+
+// Tipografía que ya usa el mapa base: así las etiquetas nunca piden una fuente que no exista.
+function fuenteDelEstilo(map) {
+  try {
+    for (const capa of map.getStyle().layers || []) {
+      const f = capa.type === 'symbol' && capa.layout && capa.layout['text-font'];
+      if (Array.isArray(f) && f.length && f.every((x) => typeof x === 'string')) return f;
+    }
+  } catch (_) { /* estilo sin capas de texto */ }
+  return null;
 }
 
 const coleccion = (features) => ({ type: 'FeatureCollection', features });
@@ -1221,27 +1274,37 @@ function crearMapaMaplibre(el, op) {
       listo = true; clearTimeout(reloj);
       map.resize();
       map.addControl(new ml.NavigationControl({ showCompass: false }), 'bottom-right');
-      map.addImage('avion-vuelo', imagenAvion(COLORES.vuelo, false), { pixelRatio: 2 });
-      map.addImage('avion-viejo', imagenAvion(COLORES.viejo, false), { pixelRatio: 2 });
-      map.addImage('avion-tierra', imagenAvion(COLORES.tierra, true), { pixelRatio: 2 });
+      for (const clase of Object.keys(TRAZOS)) {
+        map.addImage(`${clase}-vuelo`, imagenAvion(clase, COLORES.vuelo, false), { pixelRatio: 2 });
+        map.addImage(`${clase}-viejo`, imagenAvion(clase, COLORES.viejo, false), { pixelRatio: 2 });
+        map.addImage(`${clase}-tierra`, imagenAvion(clase, COLORES.tierra, true), { pixelRatio: 2 });
+      }
 
-      map.addSource('traza', { type: 'geojson', data: coleccion([]) });
-      map.addSource('aeropuertos', { type: 'geojson', data: coleccion([]) });
-      map.addSource('seleccion', { type: 'geojson', data: coleccion([]) });
-      // Agrupa aeronaves cuando hay muchas en poco espacio.
-      map.addSource('aeronaves', { type: 'geojson', data: coleccion([]), cluster: true, clusterRadius: 36, clusterMaxZoom: 5 });
+      for (const id of ['cobertura', 'traza', 'aeropuertos', 'seleccion', 'aeronaves']) map.addSource(id, { type: 'geojson', data: coleccion([]) });
 
-      map.addLayer({ id: 'traza', type: 'line', source: 'traza', paint: { 'line-color': COLORES.vuelo, 'line-width': 2, 'line-opacity': 0.75 } });
+      map.addLayer({ id: 'cobertura', type: 'line', source: 'cobertura', paint: { 'line-color': '#9aa8bc', 'line-width': 1.2, 'line-opacity': 0.7, 'line-dasharray': [3, 3] } });
+      map.addLayer({ id: 'traza', type: 'line', source: 'traza', paint: { 'line-color': COLORES.vuelo, 'line-width': 2, 'line-opacity': 0.8 } });
       map.addLayer({ id: 'aeropuertos', type: 'circle', source: 'aeropuertos',
         paint: { 'circle-radius': 5, 'circle-color': '#061220', 'circle-stroke-color': '#e8eef6', 'circle-stroke-width': 1.5 } });
-      map.addLayer({ id: 'cumulos', type: 'circle', source: 'aeronaves', filter: ['has', 'point_count'],
-        paint: { 'circle-color': '#0f3a38', 'circle-stroke-color': COLORES.vuelo, 'circle-stroke-width': 1.5,
-          'circle-radius': ['step', ['get', 'point_count'], 12, 10, 16, 50, 22, 200, 28] } });
       map.addLayer({ id: 'seleccion', type: 'circle', source: 'seleccion',
-        paint: { 'circle-radius': 20, 'circle-color': 'rgba(53,208,186,0.16)', 'circle-stroke-color': COLORES.vuelo, 'circle-stroke-width': 1.5 } });
-      map.addLayer({ id: 'aeronaves', type: 'symbol', source: 'aeronaves', filter: ['!', ['has', 'point_count']],
+        paint: { 'circle-radius': 21, 'circle-color': 'rgba(53,208,186,0.16)', 'circle-stroke-color': COLORES.vuelo, 'circle-stroke-width': 1.5 } });
+      // Cada aeronave se dibuja siempre por separado; al alejar el mapa el icono se reduce.
+      map.addLayer({ id: 'aeronaves', type: 'symbol', source: 'aeronaves',
         layout: { 'icon-image': ['get', 'icono'], 'icon-rotate': ['get', 'rumbo'], 'icon-rotation-alignment': 'map',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 3, 0.5, 5.5, 0.72, 8, 1],
           'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+
+      const fuente = fuenteDelEstilo(map);
+      if (fuente) {
+        const texto = { 'text-color': '#e8eef6', 'text-halo-color': '#061220', 'text-halo-width': 1.6 };
+        // Indicativo junto a cada aeronave al acercar. Si dos etiquetas chocan, el mapa oculta una.
+        map.addLayer({ id: 'aeronaves-etq', type: 'symbol', source: 'aeronaves', minzoom: 6.3,
+          layout: { 'text-field': ['get', 'nombre'], 'text-font': fuente, 'text-size': 11, 'text-anchor': 'top', 'text-offset': [0, 1.25], 'text-padding': 3, 'text-letter-spacing': 0.04 },
+          paint: texto });
+        map.addLayer({ id: 'aeropuertos-etq', type: 'symbol', source: 'aeropuertos', minzoom: 5.2,
+          layout: { 'text-field': ['get', 'iata'], 'text-font': fuente, 'text-size': 12, 'text-anchor': 'bottom', 'text-offset': [0, -0.7], 'text-allow-overlap': true, 'text-letter-spacing': 0.08 },
+          paint: { ...texto, 'text-color': '#ffffff' } });
+      }
 
       // Un solo manejador con área de toque amplia y prioridad: aeronave, cúmulo, aeropuerto.
       map.on('click', (e) => {
@@ -1249,8 +1312,6 @@ function crearMapaMaplibre(el, op) {
         const caja = [[p.x - r, p.y - r], [p.x + r, p.y + r]];
         const av = map.queryRenderedFeatures(caja, { layers: ['aeronaves'] })[0];
         if (av) return op.alSeleccionar?.(av.properties.id);
-        const cu = map.queryRenderedFeatures(caja, { layers: ['cumulos'] })[0];
-        if (cu) return map.easeTo({ center: cu.geometry.coordinates, zoom: map.getZoom() + 2 });
         const ap = map.queryRenderedFeatures(caja, { layers: ['aeropuertos'] })[0];
         if (ap) return op.alAeropuerto?.(ap.properties.iata);
       });
@@ -1263,8 +1324,9 @@ function crearMapaMaplibre(el, op) {
           const conPos = vuelos.filter(tienePos);
           map.getSource('aeronaves').setData(coleccion(conPos.map((v) => punto(v.lon, v.lat, {
             id: v.id,
+            nombre: v.vuelo || v.matricula || '',
             rumbo: Number.isFinite(v.rumbo) ? v.rumbo : 0,
-            icono: v.estado === 'en-tierra' ? 'avion-tierra' : (v.edad > segViejo ? 'avion-viejo' : 'avion-vuelo'),
+            icono: claseDe(v) + (v.estado === 'en-tierra' ? '-tierra' : (v.edad > segViejo ? '-viejo' : '-vuelo')),
           }))));
           const sel = conPos.find((v) => v.id === idSel);
           map.getSource('seleccion').setData(coleccion(sel ? [punto(sel.lon, sel.lat, {})] : []));
@@ -1278,6 +1340,9 @@ function crearMapaMaplibre(el, op) {
         },
         pintarAeropuertos(lista) {
           map.getSource('aeropuertos').setData(coleccion(lista.map((a) => punto(a.lon, a.lat, { iata: a.iata }))));
+        },
+        pintarCobertura(coords) {
+          map.getSource('cobertura').setData(coleccion(coords.length > 2 ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }] : []));
         },
         pintarTraza(coords) {
           map.getSource('traza').setData(coleccion(coords.length > 1 ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }] : []));
@@ -1307,7 +1372,7 @@ function crearMapaReticula(el, op) {
   const lienzo = el.querySelector('canvas');
   const capa = el.querySelector('.ret-capa');
   const vista = { lat: op.centro.lat, lon: op.centro.lon, zoom: op.centro.zoom, ancho: 1, alto: 1 };
-  let vuelos = [], idSel = null, segViejo = 60, aeropuertos = [], traza = [];
+  let vuelos = [], idSel = null, segViejo = 60, aeropuertos = [], traza = [], cobertura = [];
 
   function medir() {
     vista.ancho = el.clientWidth || 1; vista.alto = el.clientHeight || 1;
@@ -1333,6 +1398,11 @@ function crearMapaReticula(el, op) {
       g.beginPath(); g.moveTo(0, y); g.lineTo(vista.ancho, y); g.stroke();
       g.fillText(Math.abs(lat).toFixed(p < 1 ? 2 : 0) + '° ' + (lat < 0 ? 'S' : 'N'), 6, y - 4);
     }
+    if (cobertura.length > 2) {
+      g.save(); g.setLineDash([6, 6]); g.strokeStyle = 'rgba(154,168,188,.7)'; g.lineWidth = 1.2; g.beginPath();
+      cobertura.forEach(([lon, lat], i) => { const q = aPixel(lat, lon, vista); i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); });
+      g.stroke(); g.restore();
+    }
     if (traza.length > 1) {
       g.strokeStyle = 'rgba(53,208,186,.75)'; g.lineWidth = 2; g.beginPath();
       traza.forEach(([lon, lat], i) => { const q = aPixel(lat, lon, vista); i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); });
@@ -1351,7 +1421,7 @@ function crearMapaReticula(el, op) {
       const sel = v.id === idSel;
       const cls = v.estado === 'en-tierra' ? 'tierra' : (v.edad > segViejo ? 'vieja' : '');
       html += `<button type="button" class="aeronave ${cls}" style="left:${q.x.toFixed(1)}px;top:${q.y.toFixed(1)}px" data-av-mapa="${esc(v.id)}" aria-current="${sel}" aria-label="${esc(v.vuelo || v.matricula || 'Aeronave')}">
-        <span style="display:grid;transform:rotate(${Number.isFinite(v.rumbo) ? v.rumbo : 0}deg)">${ICONO_AVION}</span>
+        <span style="display:grid;transform:rotate(${Number.isFinite(v.rumbo) ? v.rumbo : 0}deg)">${svgIcono(claseDe(v))}</span>
         ${sel ? `<span class="aeronave-etq">${esc(v.vuelo || v.matricula || v.hex || '')}</span>` : ''}</button>`;
     }
     capa.innerHTML = html;
@@ -1394,6 +1464,7 @@ function crearMapaReticula(el, op) {
     pintarAeronaves(vs, sel, seg) { vuelos = vs; idSel = sel; segViejo = seg; dibujar(); },
     pintarAeropuertos(lista) { aeropuertos = lista; dibujar(); },
     pintarTraza(coords) { traza = coords; dibujar(); },
+    pintarCobertura(coords) { cobertura = coords; dibujar(); },
     volarA({ lat, lon, zoom, margenInferior = 0 }) {
       if (Number.isFinite(zoom)) vista.zoom = zoom;
       vista.lat = lat; vista.lon = lon;
@@ -1408,7 +1479,7 @@ function crearMapaReticula(el, op) {
 // ---- mapa/mapa.js
 // Punto único de entrada al mapa. Intenta MapLibre con mapa base real y, si no carga,
 // usa una retícula de coordenadas. Las dos variantes exponen la misma interfaz:
-//   tipo, pintarAeronaves(vuelos, idSel), pintarAeropuertos(lista), pintarTraza(coords),
+//   tipo, pintarAeronaves(vuelos, idSel), pintarAeropuertos(lista), pintarTraza(coords), pintarCobertura(coords),
 //   volarA({ lat, lon, zoom, margenInferior }), limites(), redimensionar()
 
 function cargarMaplibre() {
@@ -1512,6 +1583,7 @@ function pintarRadar() {
   if (mapa) {
     mapa.pintarAeronaves(vs, st.seleccion, SEG_DESACTUALIZADO);
     mapa.pintarTraza(st.seleccion ? almacen.traza(st.seleccion) : []);
+    mapa.pintarCobertura(st.modo === 'real' && st.recortado && consultaActual ? circulo(consultaActual) : []);
   }
   pintarActualizacion();
   pintarFicha(vs);
@@ -1534,7 +1606,6 @@ function pintarOrigen() {
   if ($('btnFuente').innerHTML !== html) $('btnFuente').innerHTML = html;
   const notas = [];
   if (mapa?.tipo === 'reticula') notas.push('Sin mapa base. Retícula de coordenadas reales.');
-  if (!simulado && st.recortado) notas.push('La fuente cubre 250 millas náuticas desde el centro del mapa. Acerca para ver la zona completa.');
   $('mapaNota').hidden = !notas.length;
   $('mapaNota').textContent = notas.join(' ');
 }
@@ -1550,7 +1621,7 @@ function pintarActualizacion() {
   if (estado === 'cargando') html = '<span class="punto"></span><span>Esperando la primera respuesta</span>';
   else if (estado === 'error' || estado === 'sin-config') html = '<span class="punto rojo"></span><span>Sin actualizaciones</span>';
   else if (viejo) html = `<span class="punto ambar"></span><span><b>Datos de ${hace}.</b> Sin confirmar.</span>`;
-  else html = `<span class="punto turquesa"></span><span><b>Actualizado ${hace}.</b> Cada ${st.intervalo} s.</span>`;
+  else html = `<span class="punto turquesa"></span><span><b>Actualizado ${hace}</b>${st.modo === 'real' && st.recortado ? '<small>Zona parcial: acerca el mapa</small>' : ''}</span>`;
   if (act.innerHTML !== html) act.innerHTML = html;
 }
 
@@ -1666,7 +1737,7 @@ function pintarFuentes() {
     ? { e: 'activo', d: 'MapLibre con el estilo vectorial de OpenFreeMap.' }
     : { e: 'caido', d: 'No se pudo cargar el mapa base. Se muestra una retícula de coordenadas reales.' })
     : { e: 'pendiente', d: 'Cargando.' };
-  const motivos = { cuota: ['ambar', 'Cuota agotada'], ritmo: ['ambar', 'En pausa'], 'sin-respuesta': ['rojo', 'Sin respuesta'], 'respuesta-invalida': ['rojo', 'Respuesta no válida'] };
+  const motivos = { cuota: ['ambar', 'Cuota agotada'], ritmo: ['ambar', 'En pausa'], 'en-pausa': ['ambar', 'En pausa'], 'sin-permiso': ['ambar', 'Sin permiso'], 'sin-respuesta': ['rojo', 'Sin respuesta'], 'respuesta-invalida': ['rojo', 'Respuesta no válida'] };
   const filas = [{ nombre: 'Mapa base', papel: 'Cartografía', estado: base.e, detalle: base.d }];
   for (const p of PROVEEDORES) {
     const u = st.proveedores.find((x) => x.id === p.id);
@@ -1773,6 +1844,8 @@ document.addEventListener('click', (ev) => {
     if (d.accionEstado === 'simular') { st.forzado = 'datos'; return cambiarModo('muestra'); }
     return irA(d.accionEstado);
   }
+  if (t.id === 'abrirLeyenda') { const a = $('leyenda').classList.toggle('abierta'); t.setAttribute('aria-expanded', a); return; }
+  $('leyenda').classList.remove('abierta'); $('abrirLeyenda').setAttribute('aria-expanded', 'false');
   if (t.id === 'abrirLista') return $('panelLista').classList.add('abierto');
   if (t.id === 'abrirFiltros') { $('filtros').open = true; return $('panelLista').classList.add('abierto'); }
   if (t.id === 'limpiarFiltros') return limpiarFiltros();
@@ -1805,11 +1878,46 @@ $('buscarAp').addEventListener('input', pintarAeropuertos);
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') $('sugerencias').hidden = true; });
 
 /* ---------- Arranque ---------- */
-$('region').innerHTML = REGIONES.map((r) => `<option value="${r.id}">${esc(r.nombre)}</option>`).join('');
+$('region').innerHTML = '<option value="">Ir a una región</option>' + REGIONES.map((r) => `<option value="${r.id}">${esc(r.nombre)}</option>`).join('');
+$('region').value = REGIONES[0].id;
+
+// El selector solo nombra una región mientras el mapa siga sobre ella.
+function ajustarSelectorRegion() {
+  const reg = REGIONES.find((x) => x.id === $('region').value);
+  const lim = mapa?.limites();
+  if (!reg || !lim) return;
+  const centro = { lat: (lim.norte + lim.sur) / 2, lon: (lim.oeste + lim.este) / 2 };
+  const visible = distanciaNm(centro, { lat: lim.norte, lon: lim.este });
+  if (distanciaNm(centro, reg) > Math.max(150, visible * 0.6)) $('region').value = '';
+}
+
+$('leyenda').innerHTML = `
+  <h3>Aeronaves</h3>
+  <ul>${Object.entries(CLASES).map(([k, t]) => `<li>${svgIcono(k)}<span>${t}</span></li>`).join('')}</ul>
+  <h3>Colores</h3>
+  <ul>
+    <li>${svgIcono()}<span>Posición reciente</span></li>
+    <li class="ambar">${svgIcono()}<span>Posición de hace más de un minuto</span></li>
+    <li class="tierra">${svgIcono()}<span>En tierra</span></li>
+  </ul>
+  <h3>Mapa</h3>
+  <ul>
+    <li><i class="anillo"></i><span>Aeropuerto</span></li>
+    <li><i class="linea"></i><span>Trayectoria recibida del vuelo elegido</span></li>
+    <li><i class="discontinua"></i><span>Límite de la zona consultada</span></li>
+  </ul>`;
 
 const fuenteSimulada = crearFuenteMuestra();
 let ultimaConsulta = '';
-const fuenteReal = crearFuenteServidor({ alConsultar: (q) => { ultimaConsulta = `${q.lat},${q.lon},${q.radio}`; } });
+let consultaActual = null;
+const fuenteReal = crearFuenteServidor({ alConsultar: (q) => { consultaActual = q; ultimaConsulta = `${q.lat},${q.lon},${q.radio}`; } });
+
+// Contorno de la zona que la fuente devolvió, para que se entienda por qué fuera de él no hay aeronaves.
+function circulo(q, pasos = 72) {
+  const pts = [];
+  for (let i = 0; i <= pasos; i += 1) { const p = avanzar(q.lat, q.lon, (i * 360) / pasos, q.radio); pts.push([p.lon, p.lat]); }
+  return pts;
+}
 
 function cambiarModo(modo) {
   if (modo === st.modo) return;
@@ -1847,6 +1955,7 @@ const actualizador = crearActualizador({
 let relojMover = null;
 function alMoverMapa() {
   if (st.filtros.soloArea && st.vista === 'radar') pintarRadar();
+  ajustarSelectorRegion();
   if (st.modo !== 'real') return;
   clearTimeout(relojMover);
   relojMover = setTimeout(() => {
