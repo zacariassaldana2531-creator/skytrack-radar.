@@ -436,6 +436,19 @@ button { cursor: pointer; }
 .lista-pie { padding: var(--e-3); color: var(--tenue); font-size: var(--t-s); text-align: center; }
 .segmento button:last-child { border-right: 0; }
 .segmento button[aria-selected="true"] { background: var(--grafito-500); color: var(--texto); font-weight: 500; }
+.resumen { font: 500 1.125rem/1.4 var(--f-dato); letter-spacing: .01em; }
+.resumen b { color: var(--turquesa); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tabla-ap { width: 100%; border-collapse: collapse; font-size: var(--t-s); }
+.tabla-ap th { text-align: right; font-weight: 400; color: var(--apagado); font-size: var(--t-xs); padding: 0 0 6px var(--e-2); }
+.tabla-ap th:first-child { text-align: left; padding-left: 0; }
+.tabla-ap td { text-align: right; padding: 0 0 0 var(--e-2); border-top: 1px solid var(--grafito-500); font: 500 1.0625rem/1 var(--f-dato); font-variant-numeric: tabular-nums; }
+.tabla-ap td:first-child { text-align: left; padding: 0; }
+.tabla-ap td.cero { color: var(--apagado); }
+.tabla-ap button { display: flex; align-items: baseline; gap: var(--e-2); width: 100%; min-height: var(--toque); background: none; border: 0; text-align: left; padding: 0; }
+.tabla-ap button b { font: 600 1.25rem/1 var(--f-dato); letter-spacing: .05em; min-width: 44px; }
+.tabla-ap button span { font: 400 var(--t-xs)/1.2 var(--f-texto); color: var(--tenue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabla-ap tr[aria-current="true"] td:first-child b { color: var(--turquesa); }
+.grupo-fase { font: 600 1.0625rem/1.2 var(--f-dato); color: var(--tenue); margin: var(--e-3) 0 2px; }
 #rdLista { display: grid; gap: 6px; }
 .nota { padding: var(--e-4); background: var(--grafito-700); border: 1px solid var(--linea); border-left: 4px solid var(--ambar); border-radius: 6px; }
 .nota h2 { font: 600 1.0625rem/1.2 var(--f-dato); margin: 0 0 var(--e-2); }
@@ -482,11 +495,12 @@ button { cursor: pointer; }
           <summary>Filtros <span class="conteo" id="filtrosActivos"></span></summary>
           <div class="filtros-cuerpo">
             <fieldset>
-              <legend>Categoría</legend>
+              <legend>Categoría (estimada)</legend>
               <div class="chips" id="chipsCat">
                 <button type="button" class="chip" data-cat="comercial" aria-pressed="false">Comercial</button>
                 <button type="button" class="chip" data-cat="regional" aria-pressed="false">Regional</button>
-                <button type="button" class="chip" data-cat="privado" aria-pressed="false">Privado (estimado)</button>
+                <button type="button" class="chip" data-cat="charter" aria-pressed="false">Chárter o ejecutivo</button>
+                <button type="button" class="chip" data-cat="privado" aria-pressed="false">Privado</button>
               </div>
             </fieldset>
             <fieldset>
@@ -564,9 +578,15 @@ button { cursor: pointer; }
       <div class="doc">
         <h1>República Dominicana</h1>
         <p class="entradilla" id="rdRegion"></p>
+        <p class="resumen" id="rdResumen"></p>
+        <div id="rdTabla"></div>
         <div class="chips" id="rdAeropuertos"></div>
+        <label class="campo campo-linea">
+          <span>Aerolínea</span>
+          <select id="rdAerolinea" class="entrada"></select>
+        </label>
         <div class="segmento" id="rdModo" role="tablist">
-          <button type="button" role="tab" data-modo="zona" aria-selected="true">Sobre el país</button>
+          <button type="button" role="tab" data-modo="zona" aria-selected="true">Detectado</button>
           <button type="button" role="tab" data-modo="llegadas" aria-selected="false">Llegadas</button>
           <button type="button" role="tab" data-modo="salidas" aria-selected="false">Salidas</button>
         </div>
@@ -576,7 +596,8 @@ button { cursor: pointer; }
           <ul>
             <li>Aeronaves sin transpondedor ADS-B o fuera del alcance de los receptores voluntarios.</li>
             <li>Vuelos domésticos y chárter sin número comercial: aparecen por matrícula, sin origen ni destino.</li>
-            <li>Llegadas y salidas programadas: requieren la API de horarios, que se conecta en la Fase 5.</li>
+            <li>Llegadas y salidas programadas: requieren una API de horarios con clave, que no está conectada.</li>
+            <li>«Aproximándose» y «Saliendo» son estimaciones a partir de la altitud y el rumbo, no datos del vuelo.</li>
           </ul>
         </div>
       </div>
@@ -626,15 +647,15 @@ button { cursor: pointer; }
 // ---- config.js
 // Configuración estática. No contiene claves: las credenciales vivirán en el servidor (Fase 4).
 
-// Códigos ICAO pendientes de contrastar con una base pública en la Fase 5.
+// Códigos IATA e ICAO contrastados con listados públicos de aeropuertos (octubre de 2026).
 const AEROPUERTOS_RD = [
   { iata: 'SDQ', icao: 'MDSD', nombre: 'Las Américas', ciudad: 'Santo Domingo', lat: 18.4297, lon: -69.6689 },
-  { iata: 'PUJ', icao: 'MDPC', nombre: 'Punta Cana', ciudad: 'Punta Cana', lat: 18.5674, lon: -68.3634 },
+  { iata: 'PUJ', icao: 'MDPC', nombre: 'Punta Cana', ciudad: 'Punta Cana', lat: 18.5667, lon: -68.3519 },
   { iata: 'STI', icao: 'MDST', nombre: 'Cibao', ciudad: 'Santiago', lat: 19.4061, lon: -70.6047 },
-  { iata: 'LRM', icao: 'MDLR', nombre: 'La Romana', ciudad: 'La Romana', lat: 18.4507, lon: -68.9118 },
-  { iata: 'POP', icao: 'MDPP', nombre: 'Gregorio Luperón', ciudad: 'Puerto Plata', lat: 19.7579, lon: -70.57 },
-  { iata: 'AZS', icao: 'MDCY', nombre: 'El Catey', ciudad: 'Samaná', lat: 19.267, lon: -69.742 },
-  { iata: 'JBQ', icao: 'MDJB', nombre: 'El Higüero', ciudad: 'Santo Domingo', lat: 18.5725, lon: -69.9856 },
+  { iata: 'LRM', icao: 'MDLR', nombre: 'La Romana', ciudad: 'La Romana', lat: 18.4522, lon: -68.9111 },
+  { iata: 'POP', icao: 'MDPP', nombre: 'Gregorio Luperón', ciudad: 'Puerto Plata', lat: 19.7578, lon: -70.57 },
+  { iata: 'AZS', icao: 'MDCY', nombre: 'El Catey', ciudad: 'Samaná', lat: 19.27, lon: -69.7375 },
+  { iata: 'JBQ', icao: 'MDJB', nombre: 'La Isabela (El Higüero)', ciudad: 'Santo Domingo', lat: 18.5725, lon: -69.9856 },
 ];
 
 const ZONA_HORARIA_RD = 'America/Santo_Domingo';
@@ -737,7 +758,7 @@ const ESTADOS_VUELO = {
   'desviado': { txt: 'Desviado', tono: 'rojo' },
   'desconocido': { txt: 'Desconocido', tono: '' },
 };
-const CATEGORIAS = { comercial: 'Comercial', regional: 'Regional', privado: 'Privado', militar: 'Militar' };
+const CATEGORIAS = { comercial: 'Comercial', regional: 'Regional', charter: 'Chárter o ejecutivo', privado: 'Privado', militar: 'Militar' };
 const nombreDe = (v) => v.vuelo || v.matricula || v.hex || ND;
 
 // Siluetas vistas desde arriba, con el morro hacia el norte (24 x 24).
@@ -805,6 +826,16 @@ function avanzar(lat, lon, rumbo, nm) {
   return { lat: grd(f2), lon: ((grd(l2) + 540) % 360) - 180 };
 }
 
+// Rumbo inicial (0-360, 0 = norte) para ir de a hacia b.
+function rumboA(a, b) {
+  const f1 = rad(a.lat), f2 = rad(b.lat), dl = rad(b.lon - a.lon);
+  const y = Math.sin(dl) * Math.cos(f2);
+  const x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
+  return (grd(Math.atan2(y, x)) + 360) % 360;
+}
+// Menor ángulo entre dos rumbos (0-180).
+function diferenciaAngular(a, b) { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+
 // limites: { oeste, sur, este, norte }
 function dentro(p, limites) {
   if (!limites || !tienePos(p)) return false;
@@ -845,6 +876,50 @@ function filtrar(vuelos, f, limites = null) {
 
 function contarFiltros(f) {
   return f.cats.size + (f.situacion !== 'todas') + (f.altMin > 0) + (f.velMin > 0) + !!f.aerolinea + !!f.aeropuerto + f.soloPos + f.soloArea;
+}
+
+// ---- dominio/aeropuertos.js
+// Relación entre una aeronave y un aeropuerto, deducida solo de su posición, altitud y rumbo.
+// Es una ESTIMACIÓN: sin la API de horarios no se sabe el origen ni el destino reales.
+
+const FASES = { llegando: 'Aproximándose', saliendo: 'Saliendo', tierra: 'En tierra', zona: 'En la zona' };
+const ORDEN_FASES = ['llegando', 'saliendo', 'tierra', 'zona'];
+const NM_EN_TIERRA = 4;      // una aeronave en tierra pertenece al aeropuerto si está a menos de esto
+const TECHO_MANIOBRA = 12000; // por encima de esta altitud se considera sobrevuelo
+
+function faseRespecto(v, ap) {
+  if (!tienePos(v)) return null;
+  const nm = distanciaNm(v, ap);
+  if (v.estado === 'en-tierra') return nm <= NM_EN_TIERRA ? { fase: 'tierra', nm } : null;
+  if (!Number.isFinite(v.alt) || v.alt > TECHO_MANIOBRA || !Number.isFinite(v.rumbo)) return { fase: 'zona', nm };
+  const desvio = diferenciaAngular(v.rumbo, rumboA(v, ap)); // 0 = vuela directo hacia el aeropuerto
+  const vs = Number.isFinite(v.vs) ? v.vs : 0;
+  if (desvio <= 50 && vs <= 200) return { fase: 'llegando', nm };
+  if (desvio >= 110 && vs >= 300) return { fase: 'saliendo', nm };
+  return { fase: 'zona', nm };
+}
+
+// Aeronaves dentro del radio de un aeropuerto, de la más cercana a la más lejana.
+function traficoDe(ap, vuelos, radioNm) {
+  const lista = [];
+  for (const v of vuelos) {
+    const r = faseRespecto(v, ap);
+    if (r && r.nm <= radioNm) lista.push({ v, fase: r.fase, nm: r.nm });
+  }
+  return lista.sort((a, b) => a.nm - b.nm);
+}
+
+function contarFases(trafico) {
+  const n = { llegando: 0, saliendo: 0, tierra: 0, zona: 0 };
+  for (const t of trafico) n[t.fase] += 1;
+  return n;
+}
+
+function masCercano(v, aeropuertos) {
+  if (!tienePos(v)) return null;
+  let mejor = null;
+  for (const ap of aeropuertos) { const nm = distanciaNm(v, ap); if (!mejor || nm < mejor.nm) mejor = { ap, nm }; }
+  return mejor;
 }
 
 // ---- mapa/proyeccion.js
@@ -911,9 +986,9 @@ const ESTADOS_EN_LINEA = {
   'sin-resultados': { tono: '', titulo: 'Ningún vuelo coincide con los filtros',
     texto: 'Quita algún filtro para ver más aeronaves.' },
   'aeropuerto-sin-info': { tono: 'ambar', titulo: 'Sin información actual de este aeropuerto',
-    texto: 'Las llegadas y salidas programadas necesitan la API de horarios, que se conecta en la Fase 5.' },
+    texto: 'Las llegadas y salidas programadas necesitan una API de horarios con clave, que no está conectada. Lo que sí se ve es el tráfico detectado cerca.' },
   'horarios-sin-config': { tono: 'ambar', titulo: 'Horarios sin configurar',
-    texto: 'Esta lista necesita la API de horarios (Fase 5). No se muestran llegadas ni salidas inventadas.' },
+    texto: 'Esta lista necesita una API de horarios con clave, que no está conectada. No se muestran llegadas ni salidas inventadas. La pestaña «Detectado» muestra el tráfico real cercano.' },
 };
 
 function htmlEstado(e, enLinea = false) {
@@ -930,7 +1005,7 @@ function htmlEstado(e, enLinea = false) {
 
 const celda = (valor, rotulo) => `<span>${hay(valor) ? esc(valor) : '<span class="nd">—</span>'}<small>${rotulo}</small></span>`;
 
-function htmlTira(v, seleccionado, siguiendo) {
+function htmlTira(v, seleccionado, siguiendo, nota = '') {
   const est = ESTADOS_VUELO[v.estado] || ESTADOS_VUELO.desconocido;
   const vieja = hay(v.edad) && v.edad > SEG_DESACTUALIZADO;
   const tono = vieja ? 'ambar' : est.tono;
@@ -953,15 +1028,16 @@ function htmlTira(v, seleccionado, siguiendo) {
       ${hay(v.matricula) ? `<span class="marca-dato">${esc(v.matricula)}</span>` : ''}
       ${vieja ? '<span class="marca-dato ambar">Dato antiguo</span>' : ''}
       ${siguiendo ? '<span class="marca-dato turquesa">Siguiendo</span>' : ''}
+      ${nota ? `<span class="marca-dato">${esc(nota)}</span>` : ''}
     </div>
   </button>`;
 }
 
 // Con fuentes reales puede haber cientos de aeronaves: se pinta un máximo y se avisa del resto.
 const MAX_TIRAS = 150;
-function htmlLista(vuelos, idSel, siguiendo) {
+function htmlLista(vuelos, idSel, siguiendo, notas = null) {
   const pie = vuelos.length > MAX_TIRAS ? `<p class="lista-pie">Se muestran ${MAX_TIRAS} de ${vuelos.length}. Acerca el mapa o usa los filtros para acotar.</p>` : '';
-  return vuelos.slice(0, MAX_TIRAS).map((v) => htmlTira(v, v.id === idSel, siguiendo.has(v.id))).join('') + pie;
+  return vuelos.slice(0, MAX_TIRAS).map((v) => htmlTira(v, v.id === idSel, siguiendo.has(v.id), notas?.get(v.id) || '')).join('') + pie;
 }
 
 function htmlEsqueleto(n = 4) {
@@ -978,7 +1054,7 @@ function fila(rotulo, valor, nota) {
   return `<div><dt>${esc(rotulo)}</dt>${v}</div>`;
 }
 
-function htmlFicha(v, siguiendo, puntosTraza = 0) {
+function htmlFicha(v, siguiendo, puntosTraza = 0, cercano = null) {
   const est = ESTADOS_VUELO[v.estado] || ESTADOS_VUELO.desconocido;
   const conPos = tienePos(v);
   const enTierra = v.estado === 'en-tierra';
@@ -1027,10 +1103,11 @@ function htmlFicha(v, siguiendo, puntosTraza = 0) {
 
       <h3>Ruta</h3>
       <dl class="datos">
-        ${fila('Salida programada', v.salida, hay(v.salida) ? '' : 'Requiere la API de horarios, Fase 5')}
+        ${fila('Salida programada', v.salida, hay(v.salida) ? '' : 'Requiere una API de horarios con clave')}
         ${fila('Llegada estimada', v.llegada)}
-        ${fila('Distancia recorrida', null, 'Requiere la ruta del vuelo, Fase 5')}
-        ${fila('Distancia restante', null, 'Requiere la ruta del vuelo, Fase 5')}
+        ${fila('Aeropuerto dominicano más cercano', cercano ? `${cercano.iata}, a ${cercano.nm} nm` : null, cercano ? cercano.nota : (conPos ? 'A más de 150 millas náuticas' : ''))}
+        ${fila('Distancia recorrida', null, 'Requiere conocer la ruta del vuelo')}
+        ${fila('Distancia restante', null, 'Requiere conocer la ruta del vuelo')}
         ${fila('Trayectoria observada', puntosTraza > 1 ? puntosTraza + ' posiciones' : null, puntosTraza > 1 ? 'Recibidas desde que abriste la aplicación' : 'Se dibuja al recibir dos posiciones o más')}
       </dl>
 
@@ -1172,7 +1249,7 @@ class ErrorFuente extends Error {
 
 // Convierte el área visible en centro y radio. Redondea igual que el servidor para aprovechar su caché.
 function consultaDesde(limites) {
-  if (!limites) return { lat: REGION_RD.lat, lon: REGION_RD.lon, radio: RADIO_MAX_NM, recortado: false };
+  if (!limites) return { lat: Math.round(REGION_RD.lat * 4) / 4, lon: Math.round(REGION_RD.lon * 4) / 4, radio: RADIO_MAX_NM, recortado: false };
   const lat = (limites.norte + limites.sur) / 2;
   let lon = (limites.oeste + limites.este) / 2;
   if (limites.oeste > limites.este) lon = ((lon + 360) % 360) - 180; // el área cruza el antimeridiano
@@ -1216,6 +1293,9 @@ function crearFuenteServidor({ ruta = '/api/aeronaves', alConsultar } = {}) {
 
 
 const COLORES = { vuelo: '#35d0ba', viejo: '#f0b23e', tierra: '#9aa8bc' };
+// La configuración usa la escala clásica (teselas de 256 px); MapLibre trabaja con 512 px,
+// así que el mismo encuadre es un nivel menos.
+const aNivel = (zoom) => zoom - 1;
 const LADO = { reactor: 30, ligera: 24, helicoptero: 26 };
 
 // Dibuja la silueta en un lienzo y la entrega como imagen para el mapa.
@@ -1254,7 +1334,7 @@ function crearMapaMaplibre(el, op) {
     let listo = false, descartado = false;
     const map = new ml.Map({
       container: el, style: MAPA.estilo,
-      center: [op.centro.lon, op.centro.lat], zoom: op.centro.zoom,
+      center: [op.centro.lon, op.centro.lat], zoom: aNivel(op.centro.zoom),
       dragRotate: false, pitchWithRotate: false, attributionControl: { compact: true },
     });
     map.touchZoomRotate.disableRotation();
@@ -1291,17 +1371,17 @@ function crearMapaMaplibre(el, op) {
       // Cada aeronave se dibuja siempre por separado; al alejar el mapa el icono se reduce.
       map.addLayer({ id: 'aeronaves', type: 'symbol', source: 'aeronaves',
         layout: { 'icon-image': ['get', 'icono'], 'icon-rotate': ['get', 'rumbo'], 'icon-rotation-alignment': 'map',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 3, 0.5, 5.5, 0.72, 8, 1],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 2.5, 0.5, 5, 0.75, 7.5, 1],
           'icon-allow-overlap': true, 'icon-ignore-placement': true } });
 
       const fuente = fuenteDelEstilo(map);
       if (fuente) {
         const texto = { 'text-color': '#e8eef6', 'text-halo-color': '#061220', 'text-halo-width': 1.6 };
         // Indicativo junto a cada aeronave al acercar. Si dos etiquetas chocan, el mapa oculta una.
-        map.addLayer({ id: 'aeronaves-etq', type: 'symbol', source: 'aeronaves', minzoom: 6.3,
+        map.addLayer({ id: 'aeronaves-etq', type: 'symbol', source: 'aeronaves', minzoom: 5,
           layout: { 'text-field': ['get', 'nombre'], 'text-font': fuente, 'text-size': 11, 'text-anchor': 'top', 'text-offset': [0, 1.25], 'text-padding': 3, 'text-letter-spacing': 0.04 },
           paint: texto });
-        map.addLayer({ id: 'aeropuertos-etq', type: 'symbol', source: 'aeropuertos', minzoom: 5.2,
+        map.addLayer({ id: 'aeropuertos-etq', type: 'symbol', source: 'aeropuertos', minzoom: 4.5,
           layout: { 'text-field': ['get', 'iata'], 'text-font': fuente, 'text-size': 12, 'text-anchor': 'bottom', 'text-offset': [0, -0.7], 'text-allow-overlap': true, 'text-letter-spacing': 0.08 },
           paint: { ...texto, 'text-color': '#ffffff' } });
       }
@@ -1348,7 +1428,7 @@ function crearMapaMaplibre(el, op) {
           map.getSource('traza').setData(coleccion(coords.length > 1 ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }] : []));
         },
         volarA({ lat, lon, zoom, margenInferior = 0 }) {
-          map.easeTo({ center: [lon, lat], zoom: zoom ?? map.getZoom(), padding: { top: 0, left: 0, right: 0, bottom: margenInferior }, duration: 600 });
+          map.easeTo({ center: [lon, lat], zoom: Number.isFinite(zoom) ? aNivel(zoom) : map.getZoom(), padding: { top: 0, left: 0, right: 0, bottom: margenInferior }, duration: 600 });
         },
         limites() {
           const b = map.getBounds();
@@ -1510,7 +1590,7 @@ async function crearMapa(el, opciones) {
 }
 
 // ---- app.js
-// SkyTrack Radar, Fase 4: datos reales a través del servidor propio (/api/aeronaves).
+// SkyTrack Radar, Fase 5: aeropuertos y modo República Dominicana sobre datos reales (/api/aeronaves).
 // La fuente simulada sigue disponible como modo de demostración, siempre rotulado.
 
 const $ = (id) => document.getElementById(id);
@@ -1531,7 +1611,7 @@ const st = {
   intervalo: 10,
   filtros: filtrosVacios(),
   apAbierto: null,
-  rd: { ap: null, modo: 'zona' },
+  rd: { ap: null, modo: 'zona', aerolinea: '' },
 };
 
 const almacen = crearAlmacen();
@@ -1630,9 +1710,17 @@ function pintarFicha(vs) {
   const v = vs.find((x) => x.id === st.seleccion);
   if (!v) { panel.classList.remove('abierto'); panel.innerHTML = ''; return; }
   const arriba = panel.querySelector('.ficha-cuerpo')?.scrollTop || 0;
-  panel.innerHTML = htmlFicha(v, st.siguiendo.has(v.id), almacen.traza(v.id).length);
+  panel.innerHTML = htmlFicha(v, st.siguiendo.has(v.id), almacen.traza(v.id).length, cercanoDe(v));
   panel.classList.add('abierto');
   panel.querySelector('.ficha-cuerpo').scrollTop = arriba;
+}
+
+// Aeropuerto dominicano más próximo a una aeronave y, si está cerca, qué parece estar haciendo.
+function cercanoDe(v) {
+  const c = masCercano(v, AEROPUERTOS_RD);
+  if (!c || c.nm > 150) return null;
+  const f = c.nm <= RADIO_CERCA_NM ? faseRespecto(v, c.ap) : null;
+  return { iata: c.ap.iata, nm: Math.round(c.nm), nota: f ? `${FASES[f.fase]} (estimado por altitud y rumbo)` : '' };
 }
 
 // Espacio que tapa la ficha en móvil, para centrar la aeronave en la parte visible del mapa.
@@ -1672,13 +1760,25 @@ function irA(vista) {
     if (b.dataset.ir === vista) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
   if (vista === 'radar') { mapa?.redimensionar(); pintarRadar(); }
+  // Al cambiar de vista puede cambiar la zona que hay que consultar.
+  if (st.modo === 'real' && typeof actualizador !== 'undefined') {
+    const q = consultaDesde(vista === 'rd' || vista === 'aeropuertos' ? null : mapa?.limites() || null);
+    if (`${q.lat},${q.lon},${q.radio}` !== ultimaConsulta) actualizador.ahora();
+  }
   if (vista === 'aeropuertos') pintarAeropuertos();
   if (vista === 'rd') pintarRD();
   if (vista === 'fuentes') pintarFuentes();
 }
 
 /* ---------- Aeropuertos ---------- */
-const cercaDe = (a) => todos().filter((v) => tienePos(v) && distanciaNm(v, a) <= RADIO_CERCA_NM);
+// Tiras agrupadas por lo que cada aeronave parece estar haciendo respecto al aeropuerto.
+function htmlTrafico(trafico) {
+  const notas = new Map(trafico.map((t) => [t.v.id, `A ${Math.round(t.nm)} nm`]));
+  return ORDEN_FASES.map((f) => {
+    const grupo = trafico.filter((t) => t.fase === f).map((t) => t.v);
+    return grupo.length ? `<h3 class="grupo-fase">${FASES[f]} (${grupo.length})</h3>` + htmlLista(grupo, null, st.siguiendo, notas) : '';
+  }).join('');
+}
 
 function htmlFilaAp(a) {
   return `<button type="button" class="fila-ap" data-ap="${a.iata}" aria-expanded="${st.apAbierto === a.iata}">
@@ -1691,15 +1791,19 @@ function pintarAeropuertos() {
   const q = $('buscarAp').value.trim().toLowerCase();
   const res = AEROPUERTOS_RD.filter((a) => !q || [a.iata, a.icao, a.nombre, a.ciudad].some((c) => c.toLowerCase().includes(q)));
   if (!res.length) {
-    $('listaAp').innerHTML = htmlEstado({ tono: '', titulo: 'Ningún aeropuerto coincide', texto: 'Por ahora solo están cargados los aeropuertos de República Dominicana. El catálogo mundial llega en la Fase 5.' }, true);
+    $('listaAp').innerHTML = htmlEstado({ tono: '', titulo: 'Ningún aeropuerto coincide', texto: 'Solo están cargados los aeropuertos de República Dominicana con servicio regular.' }, true);
     return;
   }
+  const vuelos = todos();
   $('listaAp').innerHTML = res.map((a) => {
     if (st.apAbierto !== a.iata) return htmlFilaAp(a);
-    const cerca = cercaDe(a);
+    const trafico = traficoDe(a, vuelos, RADIO_CERCA_NM);
     return htmlFilaAp(a) + `<div class="detalle-ap">
       <button type="button" class="btn" data-ap-ver="${a.iata}">Ver en el mapa</button>
-      <p class="entradilla">Aeronaves detectadas a menos de ${RADIO_CERCA_NM} millas náuticas: ${cerca.length ? cerca.map((v) => esc(nombreDe(v))).join(', ') : 'ninguna ahora'}.</p>
+      <p class="entradilla">${trafico.length
+        ? `${trafico.length} ${trafico.length === 1 ? 'aeronave detectada' : 'aeronaves detectadas'} a menos de ${RADIO_CERCA_NM} millas náuticas. La agrupación es una estimación por altitud y rumbo.`
+        : `Ninguna aeronave detectada ahora a menos de ${RADIO_CERCA_NM} millas náuticas.`}</p>
+      ${htmlTrafico(trafico)}
       ${htmlEstado(ESTADOS_EN_LINEA['aeropuerto-sin-info'], true)}
     </div>`;
   }).join('');
@@ -1707,26 +1811,48 @@ function pintarAeropuertos() {
 
 /* ---------- República Dominicana ---------- */
 function pintarRD() {
-  $('rdRegion').textContent = `Región de consulta: ${REGION_RD.radioNm} millas náuticas alrededor de ${REGION_RD.lat}° N, ${Math.abs(REGION_RD.lon)}° O. Una sola solicitud cubre todo el país.`;
-  $('rdAeropuertos').innerHTML = `<button type="button" class="chip" data-rdap="" aria-pressed="${st.rd.ap === null}">Todos</button>` +
-    AEROPUERTOS_RD.map((a) => `<button type="button" class="chip" data-rdap="${a.iata}" aria-pressed="${st.rd.ap === a.iata}">${a.iata}</button>`).join('');
+  $('rdRegion').textContent = `Tráfico detectado a ${REGION_RD.radioNm} millas náuticas del centro del país y a ${RADIO_CERCA_NM} de cada aeropuerto.`;
+  const todosLos = todos();
+  const enZona = todosLos.filter((v) => tienePos(v) && distanciaNm(v, REGION_RD) <= REGION_RD.radioNm);
+
+  // Aerolíneas presentes, para el filtro
+  const aerolineas = [...new Set(enZona.map((v) => v.aerolinea).filter(hay).concat(st.rd.aerolinea).filter(hay))].sort((x, y) => x.localeCompare(y, 'es'));
+  const opciones = '<option value="">Todas</option>' + aerolineas.map((x) => `<option value="${esc(x)}" ${x === st.rd.aerolinea ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  if ($('rdAerolinea').dataset.html !== opciones) { $('rdAerolinea').innerHTML = opciones; $('rdAerolinea').dataset.html = opciones; }
+  const base = st.rd.aerolinea ? enZona.filter((v) => v.aerolinea === st.rd.aerolinea) : enZona;
+
+  const enVuelo = base.filter((v) => v.estado !== 'en-tierra').length;
+  const estado = estadoActual();
+  $('rdResumen').innerHTML = SIN_DATOS.includes(estado)
+    ? 'Sin datos de posición en este momento.'
+    : `<b>${enVuelo}</b> en vuelo y <b>${base.length - enVuelo}</b> en tierra${st.rd.aerolinea ? ' de ' + esc(st.rd.aerolinea) : ''}.`;
+
+  // Tabla por aeropuerto
+  const porAp = AEROPUERTOS_RD.map((a) => ({ a, t: traficoDe(a, base, RADIO_CERCA_NM) }));
+  const celda = (n) => `<td class="${n ? '' : 'cero'}">${n}</td>`;
+  $('rdTabla').innerHTML = `<table class="tabla-ap">
+    <thead><tr><th>Aeropuerto</th><th>Llegando</th><th>Saliendo</th><th>En tierra</th><th>Zona</th></tr></thead>
+    <tbody>${porAp.map(({ a, t }) => { const n = contarFases(t); return `<tr aria-current="${st.rd.ap === a.iata}">
+      <td><button type="button" data-rdap="${st.rd.ap === a.iata ? '' : a.iata}"><b>${a.iata}</b><span>${esc(a.ciudad)}</span></button></td>
+      ${celda(n.llegando)}${celda(n.saliendo)}${celda(n.tierra)}${celda(n.zona)}</tr>`; }).join('')}</tbody></table>`;
+
+  $('rdAeropuertos').innerHTML = st.rd.ap
+    ? `<button type="button" class="chip" data-rdap="" aria-pressed="false">Volver a todo el país</button>`
+    : '<span class="entradilla">Toca un aeropuerto para ver su tráfico.</span>';
   document.querySelectorAll('#rdModo button').forEach((b) => b.setAttribute('aria-selected', b.dataset.modo === st.rd.modo));
 
-  const codigos = new Set(AEROPUERTOS_RD.map((a) => a.iata));
-  const coincide = (c) => (st.rd.ap ? c === st.rd.ap : codigos.has(c));
+  if (st.rd.modo !== 'zona') { $('rdLista').innerHTML = htmlEstado(ESTADOS_EN_LINEA['horarios-sin-config'], true); return; }
   const ap = AEROPUERTOS_RD.find((a) => a.iata === st.rd.ap);
-  const base = todos();
-  let vs;
-  if (st.rd.modo === 'llegadas') vs = base.filter((v) => coincide(v.destino));
-  else if (st.rd.modo === 'salidas') vs = base.filter((v) => coincide(v.origen));
-  else if (ap) vs = base.filter((v) => tienePos(v) && distanciaNm(v, ap) <= RADIO_CERCA_NM);
-  else vs = base.filter((v) => tienePos(v) && distanciaNm(v, REGION_RD) <= REGION_RD.radioNm);
-
-  const aviso = st.rd.modo === 'zona' ? '' : htmlEstado(ESTADOS_EN_LINEA['horarios-sin-config'], true);
-  const vacio = st.rd.modo === 'zona'
-    ? { tono: '', titulo: ap ? `Ninguna aeronave a menos de ${RADIO_CERCA_NM} millas náuticas de ${ap.iata}` : 'Ninguna aeronave detectada sobre el país', texto: 'La lista se actualiza sola con cada respuesta de la fuente.' }
-    : { tono: '', titulo: 'Sin vuelos para esta selección', texto: 'Elige otro aeropuerto o vuelve a «Todos».' };
-  $('rdLista').innerHTML = aviso + (vs.length ? htmlLista(vs, null, st.siguiendo) : htmlEstado(vacio, true));
+  if (ap) {
+    const t = porAp.find((x) => x.a === ap).t;
+    $('rdLista').innerHTML = t.length ? htmlTrafico(t)
+      : htmlEstado({ tono: '', titulo: `Ninguna aeronave a menos de ${RADIO_CERCA_NM} millas náuticas de ${ap.iata}`, texto: 'La lista se actualiza sola con cada respuesta de la fuente.' }, true);
+    return;
+  }
+  // Todo el país: cada aeronave con su aeropuerto más cercano
+  const notas = new Map(base.map((v) => { const c = cercanoDe(v); return [v.id, c ? `${c.iata} a ${c.nm} nm` : '']; }));
+  $('rdLista').innerHTML = base.length ? htmlLista([...base].sort(porNombre), null, st.siguiendo, notas)
+    : htmlEstado({ tono: '', titulo: 'Ninguna aeronave detectada', texto: st.rd.aerolinea ? 'Prueba con «Todas» en el filtro de aerolínea.' : 'La lista se actualiza sola con cada respuesta de la fuente.' }, true);
 }
 
 /* ---------- Fuentes ---------- */
@@ -1875,6 +2001,7 @@ $('region').addEventListener('change', (ev) => {
 $('buscar').addEventListener('input', (ev) => buscar(ev.target.value));
 $('buscar').addEventListener('focus', (ev) => buscar(ev.target.value));
 $('buscarAp').addEventListener('input', pintarAeropuertos);
+$('rdAerolinea').addEventListener('change', (ev) => { st.rd.aerolinea = ev.target.value; pintarRD(); });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') $('sugerencias').hidden = true; });
 
 /* ---------- Arranque ---------- */
@@ -1929,7 +2056,12 @@ function cambiarModo(modo) {
 }
 
 const actualizador = crearActualizador({
-  fuente: (args) => (st.modo === 'real' ? fuenteReal(args) : fuenteSimulada(args)),
+  // En las vistas de aeropuertos y República Dominicana se consulta siempre el país, esté donde esté el mapa.
+  fuente: (args) => {
+    const enPais = st.vista === 'rd' || st.vista === 'aeropuertos';
+    const a = enPais ? { ...args, limites: null } : args;
+    return st.modo === 'real' ? fuenteReal(a) : fuenteSimulada(a);
+  },
   intervaloSeg: st.intervalo,
   limites: () => mapa?.limites() || null,
   alRecibir(r) {
