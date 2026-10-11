@@ -5,7 +5,7 @@
 // guarda en caché unos segundos y limita solicitudes. Ningún proveedor de esta fase usa clave;
 // cuando alguno la necesite se leerá de process.env y nunca saldrá en una respuesta.
 
-const VERSION = '0.4.2';
+const VERSION = '0.5.0';
 const AGENTE = `SkyTrackRadar/${VERSION} (uso personal, no comercial)`;
 const SEG_CACHE = 5;            // una misma zona no se consulta al proveedor más de una vez cada 5 s
 const MS_ESPERA = 7000;         // tiempo máximo por proveedor
@@ -19,7 +19,8 @@ const MAX_AERONAVES = 1500;
 // Designadores OACI de aerolíneas frecuentes. Solo sirven para rotular; la ficha avisa de que es una deducción.
 const AEROLINEAS = {
   AAL: 'American Airlines', JBU: 'JetBlue', DAL: 'Delta Air Lines', UAL: 'United Airlines', NKS: 'Spirit Airlines',
-  FFT: 'Frontier Airlines', MXY: 'Breeze Airways', BWA: 'Caribbean Airlines', SWA: 'Southwest Airlines', DWI: 'Arajet', CMP: 'Copa Airlines', AVA: 'Avianca',
+  FFT: 'Frontier Airlines', MXY: 'Breeze Airways', BWA: 'Caribbean Airlines',
+  SHH: 'Sky High', CEY: 'Air Century', REA: 'RED Air', SWA: 'Southwest Airlines', DWI: 'Arajet', CMP: 'Copa Airlines', AVA: 'Avianca',
   IBE: 'Iberia', AEA: 'Air Europa', AFR: 'Air France', BAW: 'British Airways', DLH: 'Lufthansa', KLM: 'KLM',
   TAP: 'TAP Air Portugal', ACA: 'Air Canada', ROU: 'Air Canada Rouge', WJA: 'WestJet', TSC: 'Air Transat',
   SWG: 'Sunwing Airlines', CFG: 'Condor', EDW: 'Edelweiss Air', TOM: 'TUI Airways', UPS: 'UPS Airlines', FDX: 'FedEx Express',
@@ -38,6 +39,8 @@ function clasificar(indicativo, tipo, militar, categoria) {
   const m = indicativo && /^([A-Z]{3})\d/.exec(indicativo);
   if (!m) return 'privado';
   if (!AEROLINEAS[m[1]] && (categoria === 'A1' || categoria === 'A7')) return 'privado';
+  // Reactores pequeños con indicativo de operador desconocido: casi siempre chárter o flota ejecutiva.
+  if (!AEROLINEAS[m[1]] && categoria === 'A2') return 'charter';
   return tipo && TURBOHELICES_REGIONALES.has(tipo) ? 'regional' : 'comercial';
 }
 
