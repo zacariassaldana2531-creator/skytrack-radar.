@@ -411,6 +411,10 @@ button { cursor: pointer; }
 .detalle-ap { padding: var(--e-3) 0 var(--e-4); border-bottom: 1px solid var(--grafito-500); display: grid; gap: var(--e-3); }
 .segmento { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--linea); border-radius: 6px; overflow: hidden; }
 .segmento button { min-height: var(--toque); background: var(--marino-800); border: 0; border-right: 1px solid var(--linea); color: var(--tenue); font-size: var(--t-s); }
+/* dos opciones */
+.segmento.dos { grid-template-columns: 1fr 1fr; }
+.estado .btn + .btn { margin-left: var(--e-2); }
+.lista-pie { padding: var(--e-3); color: var(--tenue); font-size: var(--t-s); text-align: center; }
 .segmento button:last-child { border-right: 0; }
 .segmento button[aria-selected="true"] { background: var(--grafito-500); color: var(--texto); font-weight: 500; }
 #rdLista { display: grid; gap: 6px; }
@@ -441,11 +445,11 @@ button { cursor: pointer; }
       <div class="sugerencias" id="sugerencias" hidden></div>
     </div>
     <button class="fuente" id="btnFuente" type="button" aria-label="Estado de las fuentes de datos">
-      <span class="punto ambar"></span><span>Muestra</span>
+      <span class="punto"></span><span>Conectando</span>
     </button>
   </header>
 
-  <p class="aviso-muestra" role="status">Aeronaves simuladas. No son vuelos reales.</p>
+  <p class="aviso-muestra" id="avisoMuestra" role="status" hidden>Aeronaves simuladas. No son vuelos reales.</p>
 
   <main class="cuerpo">
 
@@ -560,7 +564,12 @@ button { cursor: pointer; }
     <section class="vista vista-doc" data-vista="fuentes" hidden>
       <div class="doc">
         <h1>Fuentes de datos</h1>
+        <div class="segmento dos" id="modoDatos" role="tablist">
+          <button type="button" role="tab" data-modo-datos="real" aria-selected="true">Datos reales</button>
+          <button type="button" role="tab" data-modo-datos="muestra" aria-selected="false">Aeronaves simuladas</button>
+        </div>
         <div id="proveedores"></div>
+        <p class="entradilla">Posiciones: Airplanes.live, adsb.fi y OpenSky Network, redes de receptores voluntarios, para uso personal y no comercial. Mapa: OpenFreeMap y colaboradores de OpenStreetMap.</p>
         <label class="campo campo-linea">
           <span>Actualizar posiciones cada</span>
           <select id="intervalo" class="entrada"></select>
@@ -616,10 +625,9 @@ const INTERVALOS = [5, 10, 15, 30, 60];
 const SEG_DESACTUALIZADO = 60;
 
 const PROVEEDORES = [
-  { id: 'muestra', nombre: 'Fuente simulada', papel: 'Aeronaves de muestra que se mueven solas', estado: 'activo', detalle: 'Sirve para probar el mapa. Se retira al conectar una fuente real en la Fase 4.' },
-  { id: 'airplanes-live', nombre: 'Airplanes.live', papel: 'Posiciones, principal', estado: 'pendiente', detalle: 'Se conecta en la Fase 4. Requiere pedir acceso para uso no comercial.' },
-  { id: 'adsb-fi', nombre: 'adsb.fi', papel: 'Posiciones, respaldo', estado: 'pendiente', detalle: 'Se conecta en la Fase 4. Uso personal con atribución.' },
-  { id: 'opensky', nombre: 'OpenSky Network', papel: 'Posiciones, tercera opción', estado: 'pendiente', detalle: 'Se conecta en la Fase 4. Cuota diaria por créditos.' },
+  { id: 'airplanes-live', nombre: 'Airplanes.live', papel: 'Posiciones, principal', estado: 'pendiente', detalle: 'Hasta 250 millas náuticas por consulta, 1 solicitud por segundo.' },
+  { id: 'adsb-fi', nombre: 'adsb.fi', papel: 'Posiciones, respaldo', estado: 'pendiente', detalle: 'Se usa si la principal no responde.' },
+  { id: 'opensky', nombre: 'OpenSky Network', papel: 'Posiciones, tercera opción', estado: 'pendiente', detalle: 'Sin matrícula ni tipo de aeronave. Cuota diaria reducida sin cuenta.' },
   { id: 'aeroapi', nombre: 'FlightAware AeroAPI', papel: 'Horarios y estados', estado: 'sin-config', detalle: 'Opcional, Fase 5. Necesita una clave guardada en el servidor.' },
 ];
 
@@ -708,7 +716,8 @@ const ESTADOS_VUELO = {
   'desviado': { txt: 'Desviado', tono: 'rojo' },
   'desconocido': { txt: 'Desconocido', tono: '' },
 };
-const CATEGORIAS = { comercial: 'Comercial', regional: 'Regional', privado: 'Privado' };
+const CATEGORIAS = { comercial: 'Comercial', regional: 'Regional', privado: 'Privado', militar: 'Militar' };
+const nombreDe = (v) => v.vuelo || v.matricula || v.hex || ND;
 
 const ICONO_AVION = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.6 0 1 .9 1 2v5l8 5v2l-8-2.5V19l2.5 2v1.5L12 21.5l-3.5 1V21l2.5-2v-5.5L3 16v-2l8-5V4c0-1.1.4-2 1-2z"/></svg>';
 
@@ -845,14 +854,14 @@ const ESTADOS = {
     titulo: 'No hay aeronaves en esta área', texto: 'Puede que no haya tráfico ahora o que ningún receptor cubra la zona. Prueba con una región más amplia.',
     accion: 'Ver República Dominicana', ir: 'rd' },
   'error': { nombre: 'Error de conexión', tono: 'rojo',
-    titulo: 'No se pudo conectar con la fuente', texto: 'Las posiciones no se están actualizando. Revisa tu conexión a Internet.',
-    accion: 'Reintentar', ir: 'reintentar' },
+    titulo: 'No se pudo conectar con la fuente', texto: 'Las posiciones no se están actualizando. Revisa tu conexión a Internet. Se reintenta solo, cada vez con más espera.',
+    accion: 'Reintentar', ir: 'reintentar', accion2: 'Usar simuladas', ir2: 'simular' },
   'sin-config': { nombre: 'API sin configurar', tono: 'ambar',
-    titulo: 'Falta configurar la fuente de datos', texto: 'El servidor no tiene credenciales para este proveedor. Añádelas en las variables de entorno y vuelve a desplegar.',
-    accion: 'Ver fuentes de datos', ir: 'fuentes' },
+    titulo: 'Falta el servidor de datos', texto: 'No se encontró /api/aeronaves en este sitio. Sube el archivo api/aeronaves.mjs al repositorio y espera al nuevo despliegue.',
+    accion: 'Reintentar', ir: 'reintentar', accion2: 'Usar simuladas', ir2: 'simular' },
   'cuota': { nombre: 'Cuota agotada', tono: 'ambar',
-    titulo: 'Se agotó la cuota de solicitudes', texto: 'El proveedor no acepta más consultas por ahora. Se conservan las últimas posiciones recibidas, marcadas como antiguas.',
-    accion: 'Ver fuentes de datos', ir: 'fuentes' },
+    titulo: 'Se agotó la cuota de solicitudes', texto: 'Los proveedores no aceptan más consultas por ahora. Si había posiciones recibidas se conservan, marcadas como antiguas. Se reintenta solo.',
+    accion: 'Reintentar', ir: 'reintentar', accion2: 'Usar simuladas', ir2: 'simular' },
   'desactualizado': { nombre: 'Datos desactualizados' },
 };
 
@@ -872,7 +881,7 @@ function htmlEstado(e, enLinea = false) {
     ${e.barrido ? '<div class="barrido" aria-hidden="true"></div>' : ''}
     <h3>${esc(e.titulo)}</h3>
     <p>${esc(e.texto)}</p>
-    ${e.accion ? `<button type="button" class="btn" data-accion-estado="${esc(e.ir)}">${esc(e.accion)}</button>` : ''}
+    ${e.accion ? `<button type="button" class="btn" data-accion-estado="${esc(e.ir)}">${esc(e.accion)}</button>` : ''}${e.accion2 ? `<button type="button" class="btn" data-accion-estado="${esc(e.ir2)}">${esc(e.accion2)}</button>` : ''}
   </div>`;
 }
 
@@ -890,7 +899,7 @@ function htmlTira(v, seleccionado, siguiendo) {
     : `<div class="tira-ruta nd">Ruta no disponible</div>`;
   const edad = fmtEdad(v.edad);
   return `<button type="button" class="tira ${tono ? 't-' + tono : ''}" data-vuelo="${esc(v.id)}" aria-current="${seleccionado}">
-    <div class="tira-id"><b>${esc(v.vuelo || v.matricula || ND)}</b><span>${esc(v.aerolinea || v.modelo || 'Aerolínea no disponible')}</span></div>
+    <div class="tira-id"><b>${esc(nombreDe(v))}</b><span>${esc(v.aerolinea || v.modelo || 'Aerolínea no disponible')}</span></div>
     ${ruta}
     <div class="tira-datos">
       ${celda(fmtAltitud(v.alt, v.estado), 'Altitud')}
@@ -908,8 +917,11 @@ function htmlTira(v, seleccionado, siguiendo) {
   </button>`;
 }
 
+// Con fuentes reales puede haber cientos de aeronaves: se pinta un máximo y se avisa del resto.
+const MAX_TIRAS = 150;
 function htmlLista(vuelos, idSel, siguiendo) {
-  return vuelos.map((v) => htmlTira(v, v.id === idSel, siguiendo.has(v.id))).join('');
+  const pie = vuelos.length > MAX_TIRAS ? `<p class="lista-pie">Se muestran ${MAX_TIRAS} de ${vuelos.length}. Acerca el mapa o usa los filtros para acotar.</p>` : '';
+  return vuelos.slice(0, MAX_TIRAS).map((v) => htmlTira(v, v.id === idSel, siguiendo.has(v.id))).join('') + pie;
 }
 
 function htmlEsqueleto(n = 4) {
@@ -933,7 +945,7 @@ function htmlFicha(v, siguiendo, puntosTraza = 0) {
   const alt = fmtAltitud(v.alt, v.estado);
   return `<div class="ficha-cab">
       <div>
-        <h2>${esc(v.vuelo || v.matricula || ND)}</h2>
+        <h2>${esc(nombreDe(v))}</h2>
         <p>${esc(v.aerolinea || 'Aerolínea no disponible')}</p>
         <span class="pildora ${est.tono}"><span class="punto ${est.tono}"></span>${esc(est.txt)}</span>
       </div>
@@ -965,16 +977,17 @@ function htmlFicha(v, siguiendo, puntosTraza = 0) {
       <h3>Identificación</h3>
       <dl class="datos">
         ${fila('Número de vuelo', v.vuelo)}
-        ${fila('Aerolínea', v.aerolinea)}
+        ${fila('Aerolínea', v.aerolinea, v.aerolineaDeducida ? 'Deducida del indicativo, no la informa la fuente' : '')}
         ${fila('Matrícula', v.matricula)}
         ${fila('Aeronave', v.modelo, v.tipo ? 'Tipo ' + v.tipo : '')}
-        ${fila('Código de la fuente', v.hex)}
+        ${fila('Código de la fuente', v.hex, v.hex && !v.simulado ? 'Dirección ICAO de 24 bits' : '')}
+        ${fila('Código de transpondedor', v.transpondedor)}
         ${fila('Categoría', CATEGORIAS[v.cat], v.catEstimada ? 'Estimada por el indicativo, no la informa la fuente' : '')}
       </dl>
 
       <h3>Ruta</h3>
       <dl class="datos">
-        ${fila('Salida programada', v.salida)}
+        ${fila('Salida programada', v.salida, hay(v.salida) ? '' : 'Requiere la API de horarios, Fase 5')}
         ${fila('Llegada estimada', v.llegada)}
         ${fila('Distancia recorrida', null, 'Requiere la ruta del vuelo, Fase 5')}
         ${fila('Distancia restante', null, 'Requiere la ruta del vuelo, Fase 5')}
@@ -1107,6 +1120,56 @@ function crearFuenteMuestra() {
   };
 }
 
+// ---- datos/fuente-servidor.js
+// Fuente real: consulta al servidor propio (/api/aeronaves), nunca a los proveedores.
+// Pide solo la zona visible del mapa, con el radio máximo que admiten los proveedores (250 nm).
+
+const RADIO_MAX_NM = 250;
+
+class ErrorFuente extends Error {
+  constructor(codigo, mensaje, proveedores = []) { super(mensaje); this.name = 'ErrorFuente'; this.codigo = codigo; this.proveedores = proveedores; }
+}
+
+// Convierte el área visible en centro y radio. Redondea igual que el servidor para aprovechar su caché.
+function consultaDesde(limites) {
+  if (!limites) return { lat: REGION_RD.lat, lon: REGION_RD.lon, radio: RADIO_MAX_NM, recortado: false };
+  const lat = (limites.norte + limites.sur) / 2;
+  let lon = (limites.oeste + limites.este) / 2;
+  if (limites.oeste > limites.este) lon = ((lon + 360) % 360) - 180; // el área cruza el antimeridiano
+  const real = distanciaNm({ lat, lon }, { lat: limites.norte, lon: limites.este });
+  return {
+    lat: Math.round(lat * 4) / 4,
+    lon: Math.round(lon * 4) / 4,
+    radio: Math.max(25, Math.min(RADIO_MAX_NM, Math.ceil(real / 25) * 25)),
+    recortado: real > RADIO_MAX_NM + 25,
+  };
+}
+
+function crearFuenteServidor({ ruta = '/api/aeronaves', alConsultar } = {}) {
+  return async function fuenteServidor({ limites, signal } = {}) {
+    const q = consultaDesde(limites);
+    alConsultar?.(q);
+    let r;
+    try {
+      r = await fetch(`${ruta}?lat=${q.lat}&lon=${q.lon}&radio=${q.radio}`, { signal, headers: { Accept: 'application/json' } });
+    } catch (e) {
+      if (e?.name === 'AbortError') throw e;
+      throw new ErrorFuente('conexion', 'No se pudo contactar con el servidor de datos');
+    }
+    let cuerpo = null;
+    try { cuerpo = await r.json(); } catch (_) { /* la respuesta no era JSON */ }
+    if (r.status === 404 || r.status === 405 || (r.ok && !cuerpo)) throw new ErrorFuente('sin-config', 'El servidor de datos no está desplegado');
+    if (r.status === 429) throw new ErrorFuente('cuota', 'Cuota de solicitudes agotada', cuerpo?.proveedores);
+    if (!r.ok || !Array.isArray(cuerpo?.vuelos)) throw new ErrorFuente('error', 'El servidor de datos no pudo responder', cuerpo?.proveedores);
+    // Las horas llegan con el reloj del servidor. Se pasan al reloj de este dispositivo para que
+    // la antigüedad mostrada no dependa de que ambos relojes coincidan. La cabecera Age indica
+    // cuántos segundos llevaba la respuesta guardada en la red de distribución.
+    const ahora = Date.now() - (Number(r.headers.get('age')) || 0) * 1000;
+    const vuelos = cuerpo.vuelos.map((v) => ({ ...v, recibido: Number.isFinite(v.recibido) ? ahora - Math.max(0, cuerpo.recibido - v.recibido) : null }));
+    return { ...cuerpo, vuelos, recibido: ahora, recortado: q.recortado };
+  };
+}
+
 // ---- mapa/mapa-maplibre.js
 // Mapa real con MapLibre GL JS y un estilo vectorial externo.
 
@@ -1209,7 +1272,7 @@ function crearMapaMaplibre(el, op) {
           if (sel) {
             const caja = document.createElement('div');
             caja.className = 'aeronave-etq etq-mapa';
-            caja.textContent = sel.vuelo || sel.matricula || '';
+            caja.textContent = sel.vuelo || sel.matricula || sel.hex || '';
             etiqueta = new ml.Marker({ element: caja, anchor: 'left', offset: [26, 0] }).setLngLat([sel.lon, sel.lat]).addTo(map);
           }
         },
@@ -1289,7 +1352,7 @@ function crearMapaReticula(el, op) {
       const cls = v.estado === 'en-tierra' ? 'tierra' : (v.edad > segViejo ? 'vieja' : '');
       html += `<button type="button" class="aeronave ${cls}" style="left:${q.x.toFixed(1)}px;top:${q.y.toFixed(1)}px" data-av-mapa="${esc(v.id)}" aria-current="${sel}" aria-label="${esc(v.vuelo || v.matricula || 'Aeronave')}">
         <span style="display:grid;transform:rotate(${Number.isFinite(v.rumbo) ? v.rumbo : 0}deg)">${ICONO_AVION}</span>
-        ${sel ? `<span class="aeronave-etq">${esc(v.vuelo || v.matricula || '')}</span>` : ''}</button>`;
+        ${sel ? `<span class="aeronave-etq">${esc(v.vuelo || v.matricula || v.hex || '')}</span>` : ''}</button>`;
     }
     capa.innerHTML = html;
   }
@@ -1376,14 +1439,18 @@ async function crearMapa(el, opciones) {
 }
 
 // ---- app.js
-// SkyTrack Radar, Fase 3: mapa, navegación, filtros y selección.
-// Los datos siguen siendo simulados (js/datos/fuente-muestra.js) hasta la Fase 4.
+// SkyTrack Radar, Fase 4: datos reales a través del servidor propio (/api/aeronaves).
+// La fuente simulada sigue disponible como modo de demostración, siempre rotulado.
 
 const $ = (id) => document.getElementById(id);
 const esMovil = () => window.matchMedia('(max-width: 899px)').matches;
 
 const st = {
   vista: 'radar',
+  modo: 'real',            // 'real' = servidor propio; 'muestra' = aeronaves simuladas
+  fuenteNombre: null,
+  proveedores: [],         // resultado de cada proveedor en la última consulta
+  recortado: false,        // el área visible es mayor que el radio que admite la fuente
   forzado: 'datos',        // estado elegido en el revisor de Fuentes; 'datos' = comportamiento real
   cargado: false,
   error: null,
@@ -1402,7 +1469,7 @@ let mapa = null;
 /* ---------- Estado y datos ---------- */
 function estadoActual() {
   if (st.forzado !== 'datos') return st.forzado;
-  if (st.error) return 'error';
+  if (st.error) return ['cuota', 'sin-config'].includes(st.error.codigo) ? st.error.codigo : 'error';
   if (!st.cargado) return 'cargando';
   if (!almacen.total()) return 'sin-vuelos';
   if ((Date.now() - st.ultimaRecepcion) / 1000 > Math.max(SEG_DESACTUALIZADO, st.intervalo * 3)) return 'desactualizado';
@@ -1416,7 +1483,8 @@ function todos() {
   const forzadoViejo = st.forzado === 'desactualizado' || st.forzado === 'cuota';
   return almacen.vuelos(Date.now(), forzadoViejo ? 180 : 0);
 }
-function visibles() { return filtrar(todos(), st.filtros, mapa?.limites() || null); }
+const porNombre = (a, b) => nombreDe(a).localeCompare(nombreDe(b), 'es', { numeric: true });
+function visibles() { return filtrar(todos(), st.filtros, mapa?.limites() || null).sort(porNombre); }
 
 /* ---------- Radar ---------- */
 function pintarRadar() {
@@ -1424,10 +1492,12 @@ function pintarRadar() {
   const e = ESTADOS[estado];
   const vs = visibles();
 
+  // Con la cuota agotada se conservan las últimas posiciones; si no hay ninguna, se explica en pantalla.
+  const cuotaConDatos = estado === 'cuota' && almacen.total() > 0;
   if (estado === 'cargando') $('lista').innerHTML = htmlEsqueleto();
-  else if (e.titulo && estado !== 'cuota') $('lista').innerHTML = htmlEstado(e, true);
+  else if (e.titulo && !cuotaConDatos) $('lista').innerHTML = htmlEstado(e, true);
   else if (!vs.length) $('lista').innerHTML = htmlEstado({ ...ESTADOS_EN_LINEA['sin-resultados'], accion: 'Quitar filtros', ir: 'limpiar' }, true);
-  else $('lista').innerHTML = (estado === 'cuota' ? htmlEstado(e, true) : '') + htmlLista(vs, st.seleccion, st.siguiendo);
+  else $('lista').innerHTML = (cuotaConDatos ? htmlEstado(e, true) : '') + htmlLista(vs, st.seleccion, st.siguiendo);
 
   $('conteo').textContent = vs.length;
   $('conteoMovil').textContent = vs.length;
@@ -1436,7 +1506,7 @@ function pintarRadar() {
   $('filtrosMovil').textContent = n || '';
 
   const sup = $('mapaEstado');
-  if (e.titulo && estado !== 'cuota') { sup.hidden = false; sup.innerHTML = htmlEstado(e); } else { sup.hidden = true; sup.innerHTML = ''; }
+  if (e.titulo && !cuotaConDatos) { sup.hidden = false; sup.innerHTML = htmlEstado(e); } else { sup.hidden = true; sup.innerHTML = ''; }
 
   if (st.seleccion && !vs.some((v) => v.id === st.seleccion)) st.seleccion = null;
   if (mapa) {
@@ -1446,6 +1516,27 @@ function pintarRadar() {
   pintarActualizacion();
   pintarFicha(vs);
   llenarSelectoresFiltro();
+  pintarOrigen();
+}
+
+// Rótulos que dicen de dónde vienen los datos: píldora superior, aviso de simulación y nota del mapa.
+function pintarOrigen() {
+  const estado = estadoActual();
+  const simulado = st.modo === 'muestra';
+  $('avisoMuestra').hidden = !simulado;
+  let tono = 'turquesa', txt = st.fuenteNombre || 'Conectando';
+  if (simulado) { tono = 'ambar'; txt = 'Muestra'; }
+  else if (['error', 'sin-config'].includes(estado)) { tono = 'rojo'; txt = 'Sin datos'; }
+  else if (estado === 'cuota') { tono = 'ambar'; txt = st.fuenteNombre || 'Cuota agotada'; }
+  else if (estado === 'desactualizado') tono = 'ambar';
+  else if (!st.cargado) tono = '';
+  const html = `<span class="punto ${tono}"></span><span>${esc(txt)}</span>`;
+  if ($('btnFuente').innerHTML !== html) $('btnFuente').innerHTML = html;
+  const notas = [];
+  if (mapa?.tipo === 'reticula') notas.push('Sin mapa base. Retícula de coordenadas reales.');
+  if (!simulado && st.recortado) notas.push('La fuente cubre 250 millas náuticas desde el centro del mapa. Acerca para ver la zona completa.');
+  $('mapaNota').hidden = !notas.length;
+  $('mapaNota').textContent = notas.join(' ');
 }
 
 function pintarActualizacion() {
@@ -1537,7 +1628,7 @@ function pintarAeropuertos() {
     const cerca = cercaDe(a);
     return htmlFilaAp(a) + `<div class="detalle-ap">
       <button type="button" class="btn" data-ap-ver="${a.iata}">Ver en el mapa</button>
-      <p class="entradilla">Aeronaves detectadas a menos de ${RADIO_CERCA_NM} millas náuticas: ${cerca.length ? cerca.map((v) => esc(v.vuelo || v.matricula)).join(', ') : 'ninguna ahora'}.</p>
+      <p class="entradilla">Aeronaves detectadas a menos de ${RADIO_CERCA_NM} millas náuticas: ${cerca.length ? cerca.map((v) => esc(nombreDe(v))).join(', ') : 'ninguna ahora'}.</p>
       ${htmlEstado(ESTADOS_EN_LINEA['aeropuerto-sin-info'], true)}
     </div>`;
   }).join('');
@@ -1575,12 +1666,24 @@ function pintarFuentes() {
     ? { e: 'activo', d: 'MapLibre con el estilo vectorial de OpenFreeMap.' }
     : { e: 'caido', d: 'No se pudo cargar el mapa base. Se muestra una retícula de coordenadas reales.' })
     : { e: 'pendiente', d: 'Cargando.' };
-  const filas = [{ nombre: 'Mapa base', papel: 'Cartografía', estado: base.e, detalle: base.d }, ...PROVEEDORES];
+  const motivos = { cuota: ['ambar', 'Cuota agotada'], ritmo: ['ambar', 'En pausa'], 'sin-respuesta': ['rojo', 'Sin respuesta'], 'respuesta-invalida': ['rojo', 'Respuesta no válida'] };
+  const filas = [{ nombre: 'Mapa base', papel: 'Cartografía', estado: base.e, detalle: base.d }];
+  for (const p of PROVEEDORES) {
+    const u = st.proveedores.find((x) => x.id === p.id);
+    let estado = p.estado, rotulo = null;
+    if (st.modo === 'muestra' && p.estado === 'pendiente') rotulo = 'No se consulta en modo simulado';
+    else if (u?.ok) estado = 'activo';
+    else if (u) { const m = motivos[u.motivo] || ['rojo', 'Sin respuesta']; estado = m[0] === 'ambar' ? 'sin-config' : 'caido'; rotulo = m[1]; }
+    else if (p.estado === 'pendiente') rotulo = st.proveedores.length ? 'De reserva' : 'En espera';
+    filas.push({ ...p, estado, rotulo });
+  }
+  if (st.modo === 'muestra') filas.push({ nombre: 'Fuente simulada', papel: 'Demostración', estado: 'sin-config', rotulo: 'En uso', detalle: 'Aeronaves inventadas que se mueven solas. No son vuelos reales.' });
   $('proveedores').innerHTML = filas.map((p) => `<div class="fila-prov">
     <span class="punto ${tono[p.estado]}"></span>
-    <b>${esc(p.nombre)}<small>${esc(txt[p.estado])}</small></b>
+    <b>${esc(p.nombre)}<small>${esc(p.rotulo || txt[p.estado])}</small></b>
     <p>${esc(p.papel)}. ${esc(p.detalle)}</p>
   </div>`).join('');
+  document.querySelectorAll('#modoDatos button').forEach((b) => b.setAttribute('aria-selected', b.dataset.modoDatos === st.modo));
   $('intervalo').innerHTML = INTERVALOS.map((s) => `<option value="${s}" ${s === st.intervalo ? 'selected' : ''}>${s} segundos</option>`).join('');
   $('revisarEstados').innerHTML = Object.entries(ESTADOS).map(([k, e]) =>
     `<button type="button" class="chip" data-estado="${k}" aria-pressed="${st.forzado === k}">${k === 'datos' ? 'Comportamiento real' : esc(e.nombre)}</button>`).join('');
@@ -1598,9 +1701,9 @@ function buscar(texto) {
     for (const v of todos()) {
       const campos = c.tipo === 'matricula' ? [v.matricula]
         : c.tipo === 'vuelo' ? [v.vuelo]
-        : [v.vuelo, v.matricula, v.aerolinea, v.tipo, v.modelo, v.origen, v.destino];
+        : [v.vuelo, v.matricula, v.hex, v.aerolinea, v.tipo, v.modelo, v.origen, v.destino];
       if (campos.some((x) => limpio(x).includes(q))) {
-        res.push({ id: v.id, clave: v.vuelo || v.matricula, sub: [v.aerolinea, v.matricula, hay(v.origen) && hay(v.destino) ? v.origen + ' a ' + v.destino : null].filter(hay).join(', '), tipo: 'Vuelo', attr: 'vuelo' });
+        res.push({ id: v.id, clave: nombreDe(v), sub: [v.aerolinea, v.matricula, hay(v.origen) && hay(v.destino) ? v.origen + ' a ' + v.destino : null].filter(hay).join(', '), tipo: 'Vuelo', attr: 'vuelo' });
       }
     }
   }
@@ -1662,10 +1765,12 @@ document.addEventListener('click', (ev) => {
   }
   if (d.rdap !== undefined) { st.rd.ap = d.rdap || null; return pintarRD(); }
   if (d.modo) { st.rd.modo = d.modo; return pintarRD(); }
+  if (d.modoDatos) { cambiarModo(d.modoDatos); return pintarFuentes(); }
   if (d.estado) { st.forzado = d.estado; st.seleccion = null; return irA('radar'); }
   if (d.accionEstado) {
     if (d.accionEstado === 'limpiar') return limpiarFiltros();
     if (d.accionEstado === 'reintentar') { if (st.forzado === 'datos') { st.error = null; st.cargado = false; pintarRadar(); actualizador.ahora(); } return; }
+    if (d.accionEstado === 'simular') { st.forzado = 'datos'; return cambiarModo('muestra'); }
     return irA(d.accionEstado);
   }
   if (t.id === 'abrirLista') return $('panelLista').classList.add('abierto');
@@ -1702,22 +1807,53 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') $('suger
 /* ---------- Arranque ---------- */
 $('region').innerHTML = REGIONES.map((r) => `<option value="${r.id}">${esc(r.nombre)}</option>`).join('');
 
+const fuenteSimulada = crearFuenteMuestra();
+let ultimaConsulta = '';
+const fuenteReal = crearFuenteServidor({ alConsultar: (q) => { ultimaConsulta = `${q.lat},${q.lon},${q.radio}`; } });
+
+function cambiarModo(modo) {
+  if (modo === st.modo) return;
+  st.modo = modo;
+  almacen.vaciar();
+  Object.assign(st, { cargado: false, error: null, seleccion: null, fuenteNombre: null, proveedores: [], recortado: false, ultimaRecepcion: null });
+  if (st.vista === 'radar') pintarRadar(); else pintarOrigen();
+  actualizador.ahora();
+}
+
 const actualizador = crearActualizador({
-  fuente: crearFuenteMuestra(),
+  fuente: (args) => (st.modo === 'real' ? fuenteReal(args) : fuenteSimulada(args)),
   intervaloSeg: st.intervalo,
   limites: () => mapa?.limites() || null,
   alRecibir(r) {
+    if (!!r.simulado !== (st.modo === 'muestra')) return; // respuesta de un modo que ya no está activo
     st.cargado = true; st.error = null; st.ultimaRecepcion = r.recibido;
-    almacen.aplicar(r.vuelos, r.recibido);
+    st.fuenteNombre = r.fuente; st.proveedores = r.proveedores || []; st.recortado = !!r.recortado;
+    almacen.aplicar(r.vuelos, Date.now());
     if (st.vista === 'radar') {
       pintarRadar();
       // Seguimiento: el mapa acompaña a la aeronave seleccionada si se está siguiendo.
       if (st.seleccion && st.siguiendo.has(st.seleccion)) { const v = todos().find((x) => x.id === st.seleccion); if (v) centrarEn(v); }
-    } else if (st.vista === 'rd') pintarRD();
-    else if (st.vista === 'aeropuertos') pintarAeropuertos();
+    } else { pintarOrigen(); if (st.vista === 'rd') pintarRD(); else if (st.vista === 'aeropuertos') pintarAeropuertos(); else pintarFuentes(); }
   },
-  alError(e) { st.error = e; console.error('[datos]', e); if (st.vista === 'radar') pintarRadar(); },
+  alError(e) {
+    st.error = e; if (e?.proveedores?.length) st.proveedores = e.proveedores;
+    console.error('[datos]', e?.codigo || '', e?.message || e);
+    if (st.vista === 'radar') pintarRadar(); else { pintarOrigen(); if (st.vista === 'fuentes') pintarFuentes(); }
+  },
 });
+
+// Al mover el mapa se pide la zona nueva, pero solo si la consulta cambia de verdad
+// (así seguir a una aeronave no dispara una solicitud por cada pequeño desplazamiento).
+let relojMover = null;
+function alMoverMapa() {
+  if (st.filtros.soloArea && st.vista === 'radar') pintarRadar();
+  if (st.modo !== 'real') return;
+  clearTimeout(relojMover);
+  relojMover = setTimeout(() => {
+    const q = consultaDesde(mapa?.limites() || null);
+    if (`${q.lat},${q.lon},${q.radio}` !== ultimaConsulta) actualizador.ahora();
+  }, 900);
+}
 
 pintarRadar();
 actualizador.iniciar();
@@ -1727,12 +1863,12 @@ crearMapa($('lienzoMapa'), {
   centro: REGIONES[0],
   alSeleccionar: (id) => seleccionar(id),
   alAeropuerto: (iata) => abrirAeropuerto(iata),
-  alMover: () => { if (st.filtros.soloArea && st.vista === 'radar') pintarRadar(); },
+  alMover: alMoverMapa,
 }).then((m) => {
   mapa = m;
   mapa.pintarAeropuertos(AEROPUERTOS_RD);
-  if (m.tipo === 'reticula') { $('mapaNota').hidden = false; $('mapaNota').textContent = 'Sin mapa base. Retícula de coordenadas reales.'; }
-  if (st.vista === 'radar') pintarRadar();
+  if (st.vista === 'radar') pintarRadar(); else pintarOrigen();
+  alMoverMapa();
 });
 
 })();</script>
