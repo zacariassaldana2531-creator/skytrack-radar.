@@ -303,7 +303,9 @@ button { cursor: pointer; }
 /* Mapa */
 .mapa { background: var(--marino-900); overflow: hidden; overflow: clip; }
 .lienzo { position: absolute; inset: 0; touch-action: none; }
-.lienzo.maplibregl-map { touch-action: auto; font: inherit; }
+/* La hoja de MapLibre se carga después y declara .maplibregl-map { position: relative }.
+   Sin esta regla más específica el contenedor queda con altura 0 y el mapa no se ve. */
+.lienzo.maplibregl-map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: auto; font: inherit; }
 .ret-lienzo { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ret-capa { position: absolute; inset: 0; pointer-events: none; }
 .ret-capa button { pointer-events: auto; }
@@ -318,7 +320,7 @@ button { cursor: pointer; }
 .region { width: auto; max-width: 46%; height: 36px; padding: 0 var(--e-2); font-size: var(--t-s); background: rgba(22, 29, 41, .95); }
 .mapa-nota { position: absolute; left: var(--e-3); bottom: 72px; z-index: 2; max-width: 70%; padding: 4px var(--e-2); background: rgba(22, 29, 41, .9); border-radius: 4px; font-size: var(--t-xs); color: var(--ambar); }
 @media (min-width: 900px) { .mapa-nota { bottom: var(--e-3); } }
-.etq-mapa { position: static; transform: none; }
+.aeronave-etq.etq-mapa { left: 0; top: 0; }
 .maplibregl-ctrl-bottom-right { bottom: 64px; }
 @media (min-width: 900px) { .maplibregl-ctrl-bottom-right { bottom: 0; } }
 .aeronave {
@@ -1151,7 +1153,10 @@ function crearMapaMaplibre(el, op) {
     map.on('error', (e) => { if (!e.sourceId && !e.tile) descartar(e.error || new Error('No se pudo cargar el estilo del mapa')); });
 
     map.on('load', () => {
+      // Si el contenedor no tiene tamaño, el mapa existe pero no se ve: mejor la retícula que una pantalla vacía.
+      if (el.clientHeight < 20 || el.clientWidth < 20) return descartar(new Error('El contenedor del mapa no tiene tamaño'));
       listo = true; clearTimeout(reloj);
+      map.resize();
       map.addControl(new ml.NavigationControl({ showCompass: false }), 'bottom-right');
       map.addImage('avion-vuelo', imagenAvion(COLORES.vuelo, false), { pixelRatio: 2 });
       map.addImage('avion-viejo', imagenAvion(COLORES.viejo, false), { pixelRatio: 2 });
